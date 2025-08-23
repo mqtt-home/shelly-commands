@@ -1,0 +1,11 @@
+version: '2'
+
+services:
+    shellycommands:
+        environment:
+            TZ: "Europe/Berlin"
+        hostname: shellycommands
+        image: pharndt/shelly-commands
+        volumes:
+            - ./config:/var/lib/shelly-commands:rw
+        restart: always

@@ -1,0 +1,65 @@
+project_name: shelly-commands
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - sh -c "cd web && (command -v pnpm >/dev/null 2>&1 || npm install -g pnpm) && pnpm install --frozen-lockfile && pnpm run build"
+
+builds:
+  - id: shelly-commands
+    main: ./main.go
+    binary: shelly-commands
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    env:
+      - CGO_ENABLED=0
+
+dockers:
+  - image_templates:
+      - "pharndt/shelly-commands:{{ .Tag }}-amd64"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    extra_files:
+      - web/dist/
+    skip_push: false
+
+  - image_templates:
+      - "pharndt/shelly-commands:{{ .Tag }}-arm64"
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goos: linux
+    goarch: arm64
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    extra_files:
+      - web/dist/
+    skip_push: false
+
+docker_manifests:
+  - id: tag
+    name_template: "pharndt/shelly-commands:{{ .Tag }}"
+    image_templates:
+      - pharndt/shelly-commands:{{ .Tag }}-amd64
+      - pharndt/shelly-commands:{{ .Tag }}-arm64
+
+  - id: latest
+    name_template: "pharndt/shelly-commands:latest"
+    image_templates:
+      - pharndt/shelly-commands:{{ .Tag }}-amd64
+      - pharndt/shelly-commands:{{ .Tag }}-arm64
+
+release:
+  disable: false
+  mode: replace
+  draft: false
+  prerelease: auto
+  make_latest: true
+  skip_upload: true

@@ -1,0 +1,27 @@
+{
+    "mqtt": {
+        "url": "tcp://192.168.0.1:1883",
+        "retain": true,
+        "topic": "_/debug/haus/shelly",
+        "qos": 2,
+        "bridge-info": true,
+        "autoPublish": true,
+        "deduplicate": true
+    },
+    "shelly": {
+        "devices": [
+            {
+                "name": "dining-room-right",
+                "topicBase": "shelly/eg/esszimmer/rechts",
+                "blindsConfig": {
+                    "TiltPercentage": 40
+                }
+            }
+        ]
+    },
+    "web": {
+        "enabled": true,
+        "port": 3000
+    },
+    "loglevel": "trace"
+}
