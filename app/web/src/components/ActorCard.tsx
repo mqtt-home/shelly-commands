@@ -23,12 +23,14 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
   const [safeModeEnabled, setSafeModeEnabled] = useState(isMobileDevice());
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [pendingTimeout, setPendingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const executingActionRef = useRef(false);
 
   // Keep position in sync with actor prop only when not loading and not executing an action
   useEffect(() => {
     if (!isLoading && !executingActionRef.current) {
       setPosition(actor.position);
+      setIsDragging(false); // Reset dragging state when position updates from server
     }
   }, [actor.position, isLoading]);
 
@@ -130,12 +132,16 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
   };
 
   const handleSliderChange = (values: number[]) => {
+    // Only update the visual preview, don't execute the command
     setPosition(values[0]);
+    setIsDragging(true);
   };
 
   const handleSliderCommit = (values: number[]) => {
     // Clear any pending actions when user manually uses slider
     clearPendingAction();
+    setIsDragging(false);
+    // Execute the actual REST command only on mouse/touch up
     handlePositionChange(values[0]);
   };
 
@@ -184,7 +190,10 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between text-sm">
-            <span>Position: {actor.position}%</span>
+            <span className={isDragging ? "text-blue-600 font-medium" : ""}>
+              Position: {position}%
+              {isDragging && <span className="text-xs ml-1">(preview)</span>}
+            </span>
             {actor.tilted && (
               <span className="text-blue-600 font-medium">
                 Tilted at {actor.tiltPosition}%
@@ -192,15 +201,16 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
             )}
           </div>
           
-          <Slider
-            value={[position]}
-            onValueChange={handleSliderChange}
-            onValueCommit={handleSliderCommit}
-            max={100}
-            step={1}
-            className="w-full touch-manipulation"
-            disabled={isLoading}
-          />
+          <div className="w-full touch-manipulation">
+            <Slider
+              value={[position]}
+              onValueChange={handleSliderChange}
+              onValueCommit={handleSliderCommit}
+              max={100}
+              step={1}
+              disabled={isLoading}
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
