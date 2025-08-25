@@ -17,6 +17,8 @@ builds:
       - arm64
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/mqtt-home/shelly-commands/version.Version={{.Version}} -X github.com/mqtt-home/shelly-commands/version.GitCommit={{.Commit}} -X github.com/mqtt-home/shelly-commands/version.BuildTime={{.Date}}
 
 dockers:
   - image_templates:

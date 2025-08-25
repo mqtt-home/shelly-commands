@@ -4,6 +4,12 @@
 GO = go
 GOFLAGS = -v
 
+# Version information
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+GIT_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME ?= $(shell date -u '+%Y-%m-%d %H:%M:%S UTC')
+LDFLAGS = -ldflags "-s -w -X 'github.com/mqtt-home/shelly-commands/version.Version=$(VERSION)' -X 'github.com/mqtt-home/shelly-commands/version.GitCommit=$(GIT_COMMIT)' -X 'github.com/mqtt-home/shelly-commands/version.BuildTime=$(BUILD_TIME)'"
+
 # Set the paths
 BUILD_DIR = build
 CONFIG_DIR = $(PWD)/../production/config
@@ -16,6 +22,12 @@ DOCKER_IMAGE_NAME = pharndt/shelly-commands:latest
 .PHONY: build
 build: build-frontend build-backend
 
+.PHONY: version
+version:
+	@echo "Version: $(VERSION)"
+	@echo "Git Commit: $(GIT_COMMIT)"
+	@echo "Build Time: $(BUILD_TIME)"
+
 .PHONY: build-frontend
 build-frontend:
 	@echo "Building the frontend..."
@@ -24,7 +36,7 @@ build-frontend:
 .PHONY: build-backend
 build-backend:
 	@echo "Building the backend..."
-	@$(GO) build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) .
+	@$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) .
 
 .PHONY: dev-frontend
 dev-frontend:

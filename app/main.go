@@ -11,6 +11,7 @@ import (
 	"github.com/mqtt-home/shelly-commands/commands"
 	"github.com/mqtt-home/shelly-commands/config"
 	"github.com/mqtt-home/shelly-commands/shelly"
+	"github.com/mqtt-home/shelly-commands/version"
 	"github.com/mqtt-home/shelly-commands/web"
 	"github.com/philipparndt/go-logger"
 	"github.com/philipparndt/mqtt-gateway/mqtt"
@@ -58,6 +59,8 @@ func subscribeToCommands(cfg config.Config, actors *shelly.ActorRegistry) {
 var registry = shelly.NewActorRegistry()
 
 func main() {
+	logger.Info("Shelly Commands", version.Info())
+	
 	if len(os.Args) < 2 {
 		logger.Error("No configuration file specified")
 		os.Exit(1)
