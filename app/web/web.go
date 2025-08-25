@@ -60,7 +60,7 @@ func NewWebServer(registry *shelly.ActorRegistry) *WebServer {
 }
 
 func (ws *WebServer) setupRoutes() {
-	ws.router.Use(middleware.Logger)
+	ws.router.Use(ChiLogger())
 	ws.router.Use(middleware.Recoverer)
 
 	// CORS configuration
