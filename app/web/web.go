@@ -14,6 +14,7 @@ import (
 	"github.com/mqtt-home/shelly-commands/commands"
 	"github.com/mqtt-home/shelly-commands/shelly"
 	"github.com/philipparndt/go-logger"
+	"github.com/philipparndt/go-logger-chi"
 )
 
 // SSE client connection
@@ -60,7 +61,7 @@ func NewWebServer(registry *shelly.ActorRegistry) *WebServer {
 }
 
 func (ws *WebServer) setupRoutes() {
-	ws.router.Use(ChiLogger())
+	ws.router.Use(loggerchi.Middleware())
 	ws.router.Use(middleware.Recoverer)
 
 	// CORS configuration
