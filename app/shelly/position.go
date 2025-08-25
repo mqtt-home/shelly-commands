@@ -42,7 +42,16 @@ func (s *ShadingActor) SetPosition(position int) (bool, error) {
 	// see:
 	// https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Cover#mqtt-control
 
-	mqtt.PublishAbsolute(s.TopicBase+"/command/cover:0", "pos,"+strconv.Itoa(position), false)
+	if position == 0 {
+		logger.Debug("Close blinds", s.Name)
+		mqtt.PublishAbsolute(s.TopicBase+"/command/cover:0", "close", false)
+	} else if position == 100 {
+		logger.Debug("Open blinds", s.Name)
+		mqtt.PublishAbsolute(s.TopicBase+"/command/cover:0", "open", false)
+	} else {
+		logger.Debug("Set blinds position", s.Name, "to", position)
+		mqtt.PublishAbsolute(s.TopicBase+"/command/cover:0", "pos,"+strconv.Itoa(position), false)
+	}
 
 	return true, nil
 }
