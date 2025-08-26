@@ -10,6 +10,8 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/philipparndt/go-logger v1.5.0 h1:HncIbTpLofjn1FTbTWbLjTBYIprwEjJHiHAr9xdNsWs=
 github.com/philipparndt/go-logger v1.5.0/go.mod h1:TxU7uhiBXVaypDkYrBIEW8jESwmO0LeJBK0Lfrrb1Jk=
+github.com/philipparndt/go-logger v1.6.0 h1:G0L8VP977MZ2ZzuiVKuoVyhRCFq/VSp3fZDoPmpXEk4=
+github.com/philipparndt/go-logger v1.6.0/go.mod h1:TxU7uhiBXVaypDkYrBIEW8jESwmO0LeJBK0Lfrrb1Jk=
 github.com/philipparndt/go-logger-chi v0.3.0 h1:sTUOJlWZfSyJt5XwL55shgxgtL1vUhSvV4aizInzCnE=
 github.com/philipparndt/go-logger-chi v0.3.0/go.mod h1:/5M0aUUjjgj0/aVv1gt67al2CSiKV0E6elmOqi2bYr8=
 github.com/philipparndt/mqtt-gateway v1.4.0 h1:xsVqdqKGxeezEXNTTn06l5/a9Ath9KYdtnFQSS0+jmg=
