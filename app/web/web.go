@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -14,7 +15,7 @@ import (
 	"github.com/mqtt-home/shelly-commands/commands"
 	"github.com/mqtt-home/shelly-commands/shelly"
 	"github.com/philipparndt/go-logger"
-	"github.com/philipparndt/go-logger-chi"
+	loggerchi "github.com/philipparndt/go-logger-chi"
 )
 
 // SSE client connection
@@ -76,6 +77,7 @@ func (ws *WebServer) setupRoutes() {
 
 	// API routes
 	ws.router.Route("/api", func(r chi.Router) {
+		r.Get("/health", ws.healthCheck)
 		r.Get("/actors", ws.getAllActors)
 		r.Get("/actors/{actorName}", ws.getActor)
 		r.Post("/actors/{actorName}/position", ws.setActorPosition)
@@ -90,6 +92,23 @@ func (ws *WebServer) setupRoutes() {
 	// Serve static files (React app)
 	fileServer := http.FileServer(http.Dir("./web/dist/"))
 	ws.router.Handle("/*", fileServer)
+}
+
+func (ws *WebServer) healthCheck(w http.ResponseWriter, r *http.Request) {
+	health := map[string]interface{}{
+		"status":     "ok",
+		"goroutines": runtime.NumGoroutine(),
+		"actors":     len(ws.registry.GetAllActors()),
+		"sse_clients": func() int {
+			ws.sseClients_mu.RLock()
+			defer ws.sseClients_mu.RUnlock()
+			return len(ws.sseClients)
+		}(),
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(health)
 }
 
 func (ws *WebServer) getAllActors(w http.ResponseWriter, r *http.Request) {
@@ -315,24 +334,47 @@ func (ws *WebServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case msg := <-shelly.PositionChangeChan:
-			logger.Debug("Received position change event", msg.ActorName, msg.Position)
+			logger.Debug("Received position change event for SSE", msg.ActorName, msg.Position, "client", clientID)
 			actorsState := ws.getAllActorsState()
-			message, _ := json.Marshal(actorsState)
-			fmt.Fprintf(w, "data: %s\n\n", string(message))
+			message, err := json.Marshal(actorsState)
+			if err != nil {
+				logger.Error("Failed to marshal actors state for SSE position change", err)
+				continue
+			}
+			_, writeErr := fmt.Fprintf(w, "data: %s\n\n", string(message))
+			if writeErr != nil {
+				logger.Error("Failed to write SSE position change message", writeErr, "client", clientID)
+				return
+			}
 			if ok {
 				flusher.Flush()
 			}
 		case <-r.Context().Done():
+			logger.Debug("SSE client context done", clientID)
 			return
 		case <-ticker.C:
+			logger.Debug("SSE periodic update", clientID)
 			actorsState := ws.getAllActorsState()
-			message, _ := json.Marshal(actorsState)
-			fmt.Fprintf(w, "data: %s\n\n", string(message))
+			message, err := json.Marshal(actorsState)
+			if err != nil {
+				logger.Error("Failed to marshal actors state for SSE periodic update", err)
+				continue
+			}
+			_, writeErr := fmt.Fprintf(w, "data: %s\n\n", string(message))
+			if writeErr != nil {
+				logger.Error("Failed to write SSE periodic message", writeErr, "client", clientID)
+				return
+			}
 			if ok {
 				flusher.Flush()
 			}
 		case msg := <-channel:
-			fmt.Fprintf(w, "data: %s\n\n", msg)
+			logger.Debug("SSE broadcast message", clientID)
+			_, writeErr := fmt.Fprintf(w, "data: %s\n\n", msg)
+			if writeErr != nil {
+				logger.Error("Failed to write SSE broadcast message", writeErr, "client", clientID)
+				return
+			}
 			if ok {
 				flusher.Flush()
 			}

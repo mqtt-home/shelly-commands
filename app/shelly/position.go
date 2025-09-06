@@ -32,6 +32,10 @@ func (s *ShadingActor) GetPosition() (int, error) {
 }
 
 func (s *ShadingActor) getPosition() (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	logger.Debug("Getting cached position", s.Name, s.Position)
 	return s.Position, nil
 }
 
@@ -74,26 +78,36 @@ func (s *ShadingActor) WaitForPosition(waitGroup *sync.WaitGroup, position int, 
 		return fmt.Errorf("invalid position")
 	}
 
+	logger.Info("Starting position wait", s.Name, "target position", position, "timeout", timeout)
 	waitGroup.Add(1)
 
 	go func() {
-		defer waitGroup.Done()
+		defer func() {
+			logger.Debug("Position wait goroutine finishing", s.Name, "target", position)
+			waitGroup.Done()
+		}()
+
 		startTime := time.Now()
+		checkCount := 0
 
 		for {
+			checkCount++
 			currentPosition, err := s.GetPosition()
 			if err != nil {
-				logger.Error("Failed to get position", err)
-				return
-			}
-			if currentPosition == position {
-				logger.Debug(fmt.Sprintf("Position %d reached", position))
+				logger.Error("Failed to get position during wait", s.Name, err)
 				return
 			}
 
-			logger.Debug(fmt.Sprintf("Waiting for position %d (current: %d)", position, currentPosition))
-			if time.Since(startTime).Seconds() > float64(timeout) {
-				logger.Error("Timeout waiting for position")
+			if currentPosition == position {
+				logger.Info("Position reached successfully", s.Name, "position", position, "checks", checkCount, "duration", time.Since(startTime))
+				return
+			}
+
+			elapsed := time.Since(startTime)
+			logger.Debug("Waiting for position", s.Name, "target", position, "current", currentPosition, "elapsed", elapsed, "checks", checkCount)
+
+			if elapsed.Seconds() > float64(timeout) {
+				logger.Error("Timeout waiting for position", s.Name, "target", position, "current", currentPosition, "timeout", timeout, "checks", checkCount)
 				return
 			}
 

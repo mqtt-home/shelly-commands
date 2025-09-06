@@ -7,9 +7,11 @@ import (
 	"strconv"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/mqtt-home/shelly-commands/commands"
 	"github.com/mqtt-home/shelly-commands/config"
+	"github.com/mqtt-home/shelly-commands/monitor"
 	"github.com/mqtt-home/shelly-commands/shelly"
 	"github.com/mqtt-home/shelly-commands/version"
 	"github.com/mqtt-home/shelly-commands/web"
@@ -39,20 +41,36 @@ func startActor(device *config.Device, wg *sync.WaitGroup) *shelly.ShadingActor 
 func subscribeToCommands(cfg config.Config, actors *shelly.ActorRegistry) {
 	prefix := cfg.MQTT.Topic + "/"
 	postfix := "/set"
+
+	logger.Info("Subscribing to MQTT commands", "pattern", prefix+"+"+postfix)
+
 	mqtt.Subscribe(prefix+"+"+postfix, func(topic string, payload []byte) {
-		logger.Debug("Received message", topic, string(payload))
-		actor := actors.GetActor(topic[len(prefix) : len(topic)-len(postfix)])
+		logger.Debug("Received MQTT command message", topic, string(payload))
+
+		actorName := topic[len(prefix) : len(topic)-len(postfix)]
+		actor := actors.GetActor(actorName)
 		if actor == nil {
-			logger.Error("Unknown actor:", topic)
+			logger.Error("Unknown actor in command", "topic", topic, "actor_name", actorName)
 			return
 		}
 
 		command, err := commands.Parse(payload)
 		if err != nil {
-			logger.Error("Failed to parse command", err)
+			logger.Error("Failed to parse command", "topic", topic, "payload", string(payload), "error", err)
 			return
 		}
-		go actor.Apply(command)
+
+		logger.Info("Processing command", "actor", actorName, "action", command.Action, "position", command.Position)
+
+		// Run command in separate goroutine to avoid blocking MQTT processing
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("Panic in command processing", "actor", actorName, "panic", r)
+				}
+			}()
+			actor.Apply(command)
+		}()
 	})
 }
 
@@ -60,7 +78,7 @@ var registry = shelly.NewActorRegistry()
 
 func main() {
 	logger.Info("Shelly Commands", version.Info())
-	
+
 	if len(os.Args) < 2 {
 		logger.Error("No configuration file specified")
 		os.Exit(1)
@@ -77,6 +95,13 @@ func main() {
 	}
 
 	logger.SetLevel(cfg.LogLevel)
+
+	// Start deadlock monitor
+	deadlockMonitor := monitor.NewDeadlockMonitor(30*time.Second, 4, 50)
+	deadlockMonitor.Start()
+	defer deadlockMonitor.Stop()
+
+	logger.Info("Deadlock monitor started")
 
 	mqtt.Start(cfg.MQTT, "shelly_mqtt")
 
