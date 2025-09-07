@@ -148,7 +148,7 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
   return (
     <Card className="w-full max-w-md touch-manipulation">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex items-center justify-between leading-tight">
           <span className="truncate">{actor.displayName}</span>
           <div className="flex items-center gap-1 ml-2">
             <Button
