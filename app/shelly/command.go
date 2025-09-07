@@ -2,6 +2,7 @@ package shelly
 
 import (
 	"sync"
+	"time"
 
 	"github.com/mqtt-home/shelly-commands/commands"
 	"github.com/mqtt-home/shelly-commands/config"
@@ -47,6 +48,9 @@ func (s *ShadingActor) Tilt(position int) {
 	logger.Debug("Waiting for position to be reached", s.Name)
 	wg.Wait()
 	logger.Debug("Position reached, setting slat position", s.Name)
+
+	// Wait between up and down for at least 500ms as specified in the motor documentation
+	time.Sleep(500 * time.Millisecond)
 
 	_, err = s.SetSlatPosition(s.Config.TiltPercentage)
 	if err != nil {
