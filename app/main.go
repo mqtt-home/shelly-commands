@@ -96,12 +96,14 @@ func main() {
 
 	logger.SetLevel(cfg.LogLevel)
 
-	// Start deadlock monitor
-	deadlockMonitor := monitor.NewDeadlockMonitor(30*time.Second, 4, 50)
-	deadlockMonitor.Start()
-	defer deadlockMonitor.Stop()
+	if logger.IsLevelEnabled("trace") {
+		// Start deadlock monitor
+		deadlockMonitor := monitor.NewDeadlockMonitor(30*time.Second, 4, 50)
+		deadlockMonitor.Start()
+		defer deadlockMonitor.Stop()
 
-	logger.Info("Deadlock monitor started")
+		logger.Info("Deadlock monitor started")
+	}
 
 	mqtt.Start(cfg.MQTT, "shelly_mqtt")
 
