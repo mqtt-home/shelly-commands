@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ActorStatus } from '@/types/actor';
-import { setActorPosition, tiltActor } from '@/lib/api';
+import { setActorPosition, tiltActor, setSlatPosition } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -86,6 +86,21 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
     } catch (error) {
       console.error('Failed to tilt:', error);
       alert('Failed to tilt. Please try again.');
+    } finally {
+      setIsLoading(false);
+      executingActionRef.current = false;
+    }
+  };
+
+  const handleSlatPosition = async (slatPosition: number) => {
+    setIsLoading(true);
+    executingActionRef.current = true;
+    try {
+      await setSlatPosition(actor.name, slatPosition);
+      // SSE will automatically update the UI, no need to manually refresh
+    } catch (error) {
+      console.error('Failed to set slat position:', error);
+      alert('Failed to set slat position. Please try again.');
     } finally {
       setIsLoading(false);
       executingActionRef.current = false;
@@ -265,6 +280,48 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
               className="min-h-[44px] touch-manipulation text-xs px-2"
             >
               {pendingAction === 'tilt-open' ? 'Tap again' : 'Open'}
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Slat Control</p>
+          <div className="grid grid-cols-4 gap-2">
+            <Button
+              variant={pendingAction === 'slat-20' ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => handleButtonAction(() => handleSlatPosition(20), 'slat-20')}
+              disabled={isLoading}
+              className="min-h-[44px] touch-manipulation text-xs px-1"
+            >
+              {pendingAction === 'slat-20' ? 'Tap again' : '20%'}
+            </Button>
+            <Button
+              variant={pendingAction === 'slat-30' ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => handleButtonAction(() => handleSlatPosition(30), 'slat-30')}
+              disabled={isLoading}
+              className="min-h-[44px] touch-manipulation text-xs px-1"
+            >
+              {pendingAction === 'slat-30' ? 'Tap again' : '30%'}
+            </Button>
+            <Button
+              variant={pendingAction === 'slat-40' ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => handleButtonAction(() => handleSlatPosition(40), 'slat-40')}
+              disabled={isLoading}
+              className="min-h-[44px] touch-manipulation text-xs px-1"
+            >
+              {pendingAction === 'slat-40' ? 'Tap again' : '40%'}
+            </Button>
+            <Button
+              variant={pendingAction === 'slat-50' ? "destructive" : "outline"}
+              size="sm"
+              onClick={() => handleButtonAction(() => handleSlatPosition(50), 'slat-50')}
+              disabled={isLoading}
+              className="min-h-[44px] touch-manipulation text-xs px-1"
+            >
+              {pendingAction === 'slat-50' ? 'Tap again' : '50%'}
             </Button>
           </div>
         </div>

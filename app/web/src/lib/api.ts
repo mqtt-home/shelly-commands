@@ -56,3 +56,29 @@ export async function tiltAllActors(position: number): Promise<void> {
     throw new Error('Failed to tilt all actors');
   }
 }
+
+export async function setSlatPosition(name: string, position: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/actors/${encodeURIComponent(name)}/slat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ position }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to set slat position for actor ${name}`);
+  }
+}
+
+export async function setSlatPositionAll(position: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/actors/all/slat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ position }),
+  });
+  if (!response.ok) {
+    throw new Error('Failed to set slat position for all actors');
+  }
+}

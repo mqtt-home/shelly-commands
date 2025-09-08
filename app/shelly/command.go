@@ -22,6 +22,8 @@ func (s *ShadingActor) Apply(command commands.LLCommand) {
 		}
 	case commands.LLActionTilt:
 		s.Tilt(command.Position)
+	case commands.LLActionSlat:
+		s.SlatOnly(command.Position)
 	}
 
 	logger.Debug("Command application finished", s.Name, "action", command.Action)
@@ -65,4 +67,21 @@ func (s *ShadingActor) Tilt(position int) {
 	s.mu.Unlock()
 
 	logger.Info("Tilt command completed successfully", s.Name, "position", position, "tilt percentage", s.Config.TiltPercentage)
+}
+
+func (s *ShadingActor) SlatOnly(position int) {
+	logger.Info("Slat-only command started", s.Name, "slat position", position)
+
+	_, err := s.SetSlatPosition(position)
+	if err != nil {
+		logger.Error("Slat-only command failed", s.Name, err)
+		return
+	}
+
+	// Update the slat position but don't change the tilt state
+	s.mu.Lock()
+	s.TiltPosition = position
+	s.mu.Unlock()
+
+	logger.Info("Slat-only command completed successfully", s.Name, "slat position", position)
 }

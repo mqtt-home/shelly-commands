@@ -82,7 +82,9 @@ func (ws *WebServer) setupRoutes() {
 		r.Get("/actors/{actorName}", ws.getActor)
 		r.Post("/actors/{actorName}/position", ws.setActorPosition)
 		r.Post("/actors/{actorName}/tilt", ws.tiltActor)
+		r.Post("/actors/{actorName}/slat", ws.setSlatPosition)
 		r.Post("/actors/all/tilt", ws.tiltAllActors)
+		r.Post("/actors/all/slat", ws.setSlatPositionAll)
 		r.Get("/events", ws.handleSSE)
 	})
 
@@ -281,6 +283,83 @@ func (ws *WebServer) tiltAllActors(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "success",
 		"count":  tiltedCount,
+	})
+}
+
+func (ws *WebServer) setSlatPosition(w http.ResponseWriter, r *http.Request) {
+	actorName := chi.URLParam(r, "actorName")
+	actor := ws.registry.GetActor(actorName)
+
+	if actor == nil {
+		http.Error(w, fmt.Sprintf("Actor '%s' not found", actorName), http.StatusNotFound)
+		return
+	}
+
+	var req TiltRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Position < 0 || req.Position > 100 {
+		http.Error(w, "Position must be between 0 and 100", http.StatusBadRequest)
+		return
+	}
+
+	command := commands.LLCommand{
+		Action:   commands.LLActionSlat,
+		Position: req.Position,
+	}
+
+	go actor.Apply(command)
+
+	logger.Info(fmt.Sprintf("Set slat position for actor %s to %d", actorName, req.Position))
+
+	// Broadcast state change after a brief delay to allow the actor to update
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		ws.broadcastStateChange()
+	}()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+}
+
+func (ws *WebServer) setSlatPositionAll(w http.ResponseWriter, r *http.Request) {
+	var req TiltRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Position < 0 || req.Position > 100 {
+		http.Error(w, "Position must be between 0 and 100", http.StatusBadRequest)
+		return
+	}
+
+	command := commands.LLCommand{
+		Action:   commands.LLActionSlat,
+		Position: req.Position,
+	}
+
+	slatCount := 0
+	for _, actor := range ws.registry.Actors {
+		go actor.Apply(command)
+		slatCount++
+	}
+
+	logger.Info(fmt.Sprintf("Set slat position for all %d actors to %d", slatCount, req.Position))
+
+	// Broadcast state change after a brief delay to allow the actors to update
+	go func() {
+		time.Sleep(1 * time.Second)
+		ws.broadcastStateChange()
+	}()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"count":  slatCount,
 	})
 }
 

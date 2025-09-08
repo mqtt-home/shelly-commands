@@ -23,6 +23,7 @@ const (
 	ActionSet                ActionType = "set"
 	ActionCloseAndOpenBlinds ActionType = "closeandopenblinds"
 	ActionTilt               ActionType = "tilt"
+	ActionSlat               ActionType = "slat"
 )
 
 type Action struct {
@@ -60,6 +61,9 @@ func (c *Action) validate() (LLCommand, error) {
 		llc.Position = 0
 	case string(ActionTilt):
 		llc.Action = LLActionTilt
+		llc.Position = c.Position
+	case string(ActionSlat):
+		llc.Action = LLActionSlat
 		llc.Position = c.Position
 	default:
 		return llc, fmt.Errorf("invalid action")
