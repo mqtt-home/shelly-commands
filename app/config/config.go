@@ -39,6 +39,7 @@ type Device struct {
 	TopicBase    string       `json:"topicBase"`
 	DeviceType   DeviceType   `json:"deviceType,omitempty"`
 	BlindsConfig BlindsConfig `json:"blindsConfig"`
+	Rank         int          `json:"rank,omitempty"`
 }
 
 func (d *Device) String() string {
@@ -90,6 +91,10 @@ func LoadConfig(file string) (Config, error) {
 	for i := range cfg.Shelly.Devices {
 		if cfg.Shelly.Devices[i].DeviceType == "" {
 			cfg.Shelly.Devices[i].DeviceType = DeviceTypeBlinds
+		}
+		// Set default rank if not specified
+		if cfg.Shelly.Devices[i].Rank == 0 {
+			cfg.Shelly.Devices[i].Rank = 500
 		}
 	}
 

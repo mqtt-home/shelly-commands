@@ -42,6 +42,7 @@ type ActorStatus struct {
 	Tilted       bool   `json:"tilted"`
 	TiltPosition int    `json:"tiltPosition"`
 	DeviceType   string `json:"deviceType"`
+	Rank         int    `json:"rank"`
 }
 
 type TiltRequest struct {
@@ -135,6 +136,7 @@ func (ws *WebServer) getAllActors(w http.ResponseWriter, r *http.Request) {
 			Tilted:       actor.Tilted,
 			TiltPosition: actor.TiltPosition,
 			DeviceType:   string(actor.DeviceType),
+			Rank:         actor.Rank,
 		}
 		actors = append(actors, status)
 	}
@@ -168,6 +170,7 @@ func (ws *WebServer) getActor(w http.ResponseWriter, r *http.Request) {
 		Tilted:       actor.Tilted,
 		TiltPosition: actor.TiltPosition,
 		DeviceType:   string(actor.DeviceType),
+		Rank:         actor.Rank,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -551,6 +554,7 @@ func (ws *WebServer) getAllActorsState() []ActorStatus {
 			Tilted:       actor.Tilted,
 			TiltPosition: actor.TiltPosition,
 			DeviceType:   string(actor.DeviceType),
+			Rank:         actor.Rank,
 		}
 		actorsState = append(actorsState, state)
 	}

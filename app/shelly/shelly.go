@@ -20,6 +20,7 @@ type ShadingActor struct {
 	Tilted       bool
 	TiltPosition int
 	Position     int
+	Rank         int
 	mu           sync.Mutex
 }
 
@@ -31,6 +32,7 @@ func NewShadingActor(device config.Device) *ShadingActor {
 		Config:     device.BlindsConfig,
 		DeviceType: device.DeviceType,
 		Tilted:     false,
+		Rank:       device.Rank,
 	}
 	err := actor.init()
 	if err != nil {

@@ -324,7 +324,13 @@ export function App() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {actors.sort((a, b) => a.name.localeCompare(b.name)).map((actor) => (
+            {actors.sort((a, b) => {
+              // Sort by rank first (ascending), then by name (alphabetically)
+              if (a.rank !== b.rank) {
+                return a.rank - b.rank;
+              }
+              return a.name.localeCompare(b.name);
+            }).map((actor) => (
               <ActorCard
                 key={actor.name}
                 actor={actor}
