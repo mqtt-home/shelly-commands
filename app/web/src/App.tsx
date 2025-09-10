@@ -20,7 +20,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [globalSafeMode, setGlobalSafeMode] = useState(isMobileDevice());
   const [pendingGlobalAction, setPendingGlobalAction] = useState<string | null>(null);
-  const [globalPendingTimeout, setGlobalPendingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [globalPendingTimeout, setGlobalPendingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const executingGlobalActionRef = useRef(false);
   
   // Use SSE for real-time updates
@@ -267,13 +267,6 @@ export function App() {
                     className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
                   >
                     {pendingGlobalAction === 'tilt-all-half' ? 'Tap again' : 'Tilt All Half'}
-                  </Button>
-                  <Button
-                    variant={pendingGlobalAction === 'tilt-all-open' ? "destructive" : "secondary"}
-                    onClick={() => handleGlobalAction(() => handleTiltAll(75), 'tilt-all-open')}
-                    className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
-                  >
-                    {pendingGlobalAction === 'tilt-all-open' ? 'Tap again' : 'Tilt All Open'}
                   </Button>
                 </div>
               </CardContent>

@@ -22,7 +22,7 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [safeModeEnabled, setSafeModeEnabled] = useState(isMobileDevice());
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [pendingTimeout, setPendingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [pendingTimeout, setPendingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const executingActionRef = useRef(false);
 
@@ -253,7 +253,7 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
 
         <div className="space-y-2">
           <p className="text-sm font-medium">Tilt Operations</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Button
               variant={pendingAction === 'tilt-closed' ? "destructive" : "secondary"}
               size="sm"
@@ -271,15 +271,6 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
               className="min-h-[44px] touch-manipulation text-xs px-2"
             >
               {pendingAction === 'tilt-half' ? 'Tap again' : 'Half'}
-            </Button>
-            <Button
-              variant={pendingAction === 'tilt-open' ? "destructive" : "secondary"}
-              size="sm"
-              onClick={() => handleButtonAction(() => handleTilt(75), 'tilt-open')}
-              disabled={isLoading}
-              className="min-h-[44px] touch-manipulation text-xs px-2"
-            >
-              {pendingAction === 'tilt-open' ? 'Tap again' : 'Open'}
             </Button>
           </div>
         </div>
