@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { ActorStatus } from '@/types/actor';
-import { fetchActors, tiltAllActors } from '@/lib/api';
+import { API_BASE, fetchActors, tiltAllActors } from '@/lib/api';
 import { useSSE } from '@/hooks/useSSE';
 import { ActorCard } from '@/components/ActorCard';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -24,7 +24,7 @@ export function App() {
   const executingGlobalActionRef = useRef(false);
   
   // Use SSE for real-time updates
-  const { data: sseData, isConnected, error: sseError, reconnect } = useSSE('/api/events');
+  const { data: sseData, isConnected, error: sseError, reconnect } = useSSE(API_BASE + '/events');
 
   // Update actors when SSE data changes
   useEffect(() => {

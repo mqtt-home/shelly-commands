@@ -1,6 +1,6 @@
 import { ActorStatus } from '@/types/actor';
 
-const API_BASE = '/api';
+export const API_BASE = import.meta.env.DEV ? 'http://localhost:3000/api' : '/api';
 
 export async function fetchActors(): Promise<ActorStatus[]> {
   const response = await fetch(`${API_BASE}/actors`);
