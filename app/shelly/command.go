@@ -72,6 +72,14 @@ func (s *ShadingActor) Tilt(position int) {
 func (s *ShadingActor) SlatOnly(position int) {
 	logger.Info("Slat-only command started", s.Name, "slat position", position)
 
+	if position != 0 {
+		_, err := s.SetSlatPosition(0)
+		if err != nil {
+			logger.Error("Slat-only command failed", s.Name, err)
+			return
+		}
+	}
+
 	_, err := s.SetSlatPosition(position)
 	if err != nil {
 		logger.Error("Slat-only command failed", s.Name, err)
