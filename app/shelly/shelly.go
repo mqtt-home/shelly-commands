@@ -16,6 +16,7 @@ type ShadingActor struct {
 	TopicBase    string
 	Serial       string
 	Config       config.BlindsConfig
+	DeviceType   config.DeviceType
 	Tilted       bool
 	TiltPosition int
 	Position     int
@@ -24,11 +25,12 @@ type ShadingActor struct {
 
 func NewShadingActor(device config.Device) *ShadingActor {
 	actor := &ShadingActor{
-		device:    device,
-		Name:      device.Name,
-		TopicBase: device.TopicBase,
-		Config:    device.BlindsConfig,
-		Tilted:    false,
+		device:     device,
+		Name:       device.Name,
+		TopicBase:  device.TopicBase,
+		Config:     device.BlindsConfig,
+		DeviceType: device.DeviceType,
+		Tilted:     false,
 	}
 	err := actor.init()
 	if err != nil {
@@ -46,7 +48,15 @@ func (s *ShadingActor) DisplayName() string {
 }
 
 func (s *ShadingActor) String() string {
-	return fmt.Sprintf("ShadingActor{name: %s; topic_base: %s}", s.Name, s.TopicBase)
+	return fmt.Sprintf("ShadingActor{name: %s; topic_base: %s; type: %s}", s.Name, s.TopicBase, s.DeviceType)
+}
+
+func (s *ShadingActor) IsRollerShutter() bool {
+	return s.DeviceType == config.DeviceTypeRollerShutter
+}
+
+func (s *ShadingActor) IsBlinds() bool {
+	return s.DeviceType == config.DeviceTypeBlinds
 }
 
 func (s *ShadingActor) Start() error {

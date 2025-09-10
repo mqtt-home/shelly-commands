@@ -13,9 +13,15 @@
             {
                 "name": "dining-room-right",
                 "topicBase": "shelly/eg/esszimmer/rechts",
+                "deviceType": "blinds",
                 "blindsConfig": {
                     "TiltPercentage": 40
                 }
+            },
+            {
+                "name": "living-room-roller",
+                "topicBase": "shelly/eg/wohnzimmer/roller",
+                "deviceType": "rollershutter"
             }
         ]
     },

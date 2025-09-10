@@ -6,4 +6,5 @@ export interface ActorStatus {
   position: number;
   tilted: boolean;
   tiltPosition: number;
+  deviceType: string;
 }

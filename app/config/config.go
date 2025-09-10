@@ -23,6 +23,13 @@ type WebConfig struct {
 	Port    int  `json:"port"`
 }
 
+type DeviceType string
+
+const (
+	DeviceTypeBlinds        DeviceType = "blinds"
+	DeviceTypeRollerShutter DeviceType = "rollershutter"
+)
+
 type BlindsConfig struct {
 	TiltPercentage int `json:"tiltPercentage"`
 }
@@ -30,11 +37,20 @@ type BlindsConfig struct {
 type Device struct {
 	Name         string       `json:"name"`
 	TopicBase    string       `json:"topicBase"`
+	DeviceType   DeviceType   `json:"deviceType,omitempty"`
 	BlindsConfig BlindsConfig `json:"blindsConfig"`
 }
 
 func (d *Device) String() string {
-	return fmt.Sprintf("Device{name: %s; base: %s}", d.Name, d.TopicBase)
+	return fmt.Sprintf("Device{name: %s; base: %s; type: %s}", d.Name, d.TopicBase, d.DeviceType)
+}
+
+func (d *Device) IsRollerShutter() bool {
+	return d.DeviceType == DeviceTypeRollerShutter
+}
+
+func (d *Device) IsBlinds() bool {
+	return d.DeviceType == DeviceTypeBlinds
 }
 
 type Shelly struct {
@@ -68,6 +84,13 @@ func LoadConfig(file string) (Config, error) {
 	if cfg.Shelly.OptimizeTilt == nil {
 		defaultOptimizeTilt := true
 		cfg.Shelly.OptimizeTilt = &defaultOptimizeTilt
+	}
+
+	// Set default device type for devices that don't have it specified
+	for i := range cfg.Shelly.Devices {
+		if cfg.Shelly.Devices[i].DeviceType == "" {
+			cfg.Shelly.Devices[i].DeviceType = DeviceTypeBlinds
+		}
 	}
 
 	return cfg, nil

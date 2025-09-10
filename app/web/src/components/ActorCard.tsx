@@ -190,6 +190,9 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
         </CardTitle>
         <CardDescription>
           {actor.ip} {actor.serial && `(${actor.serial})`}
+          <span className="text-xs text-muted-foreground ml-2">
+            {actor.deviceType === 'rollershutter' ? 'Roller Shutter' : 'Blinds'}
+          </span>
           {safeModeEnabled && (
             <div className="text-xs text-blue-600 mt-1">
               Safe Mode: Double tap buttons to execute
@@ -209,7 +212,7 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
               Position: {position}%
               {isDragging && <span className="text-xs ml-1">(preview)</span>}
             </span>
-            {actor.tilted && (
+            {actor.deviceType === 'blinds' && actor.tilted && (
               <span className="text-blue-600 font-medium">
                 Tilted at {actor.tiltPosition}%
               </span>
@@ -251,71 +254,117 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
           </Button>
         </div>
 
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Tilt Operations</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Button
-              variant={pendingAction === 'tilt-closed' ? "destructive" : "secondary"}
-              size="sm"
-              onClick={() => handleButtonAction(() => handleTilt(0), 'tilt-closed')}
-              disabled={isLoading}
-              className="min-h-[44px] touch-manipulation text-xs px-2"
-            >
-              {pendingAction === 'tilt-closed' ? 'Tap again' : 'Closed'}
-            </Button>
-            <Button
-              variant={pendingAction === 'tilt-half' ? "destructive" : "secondary"}
-              size="sm"
-              onClick={() => handleButtonAction(() => handleTilt(50), 'tilt-half')}
-              disabled={isLoading}
-              className="min-h-[44px] touch-manipulation text-xs px-2"
-            >
-              {pendingAction === 'tilt-half' ? 'Tap again' : 'Half'}
-            </Button>
+        {actor.deviceType === 'rollershutter' ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Quick Positions</p>
+            <div className="grid grid-cols-4 gap-2">
+              <Button
+                variant={pendingAction === 'pos-20' ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => handleButtonAction(() => handlePositionChange(20), 'pos-20')}
+                disabled={isLoading}
+                className="min-h-[44px] touch-manipulation text-xs px-1"
+              >
+                {pendingAction === 'pos-20' ? 'Tap again' : '20%'}
+              </Button>
+              <Button
+                variant={pendingAction === 'pos-40' ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => handleButtonAction(() => handlePositionChange(40), 'pos-40')}
+                disabled={isLoading}
+                className="min-h-[44px] touch-manipulation text-xs px-1"
+              >
+                {pendingAction === 'pos-40' ? 'Tap again' : '40%'}
+              </Button>
+              <Button
+                variant={pendingAction === 'pos-60' ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => handleButtonAction(() => handlePositionChange(60), 'pos-60')}
+                disabled={isLoading}
+                className="min-h-[44px] touch-manipulation text-xs px-1"
+              >
+                {pendingAction === 'pos-60' ? 'Tap again' : '60%'}
+              </Button>
+              <Button
+                variant={pendingAction === 'pos-80' ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => handleButtonAction(() => handlePositionChange(80), 'pos-80')}
+                disabled={isLoading}
+                className="min-h-[44px] touch-manipulation text-xs px-1"
+              >
+                {pendingAction === 'pos-80' ? 'Tap again' : '80%'}
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Tilt Operations</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant={pendingAction === 'tilt-closed' ? "destructive" : "secondary"}
+                  size="sm"
+                  onClick={() => handleButtonAction(() => handleTilt(0), 'tilt-closed')}
+                  disabled={isLoading}
+                  className="min-h-[44px] touch-manipulation text-xs px-2"
+                >
+                  {pendingAction === 'tilt-closed' ? 'Tap again' : 'Closed'}
+                </Button>
+                <Button
+                  variant={pendingAction === 'tilt-half' ? "destructive" : "secondary"}
+                  size="sm"
+                  onClick={() => handleButtonAction(() => handleTilt(50), 'tilt-half')}
+                  disabled={isLoading}
+                  className="min-h-[44px] touch-manipulation text-xs px-2"
+                >
+                  {pendingAction === 'tilt-half' ? 'Tap again' : 'Half'}
+                </Button>
+              </div>
+            </div>
 
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Slat Control</p>
-          <div className="grid grid-cols-4 gap-2">
-            <Button
-              variant={pendingAction === 'slat-20' ? "destructive" : "outline"}
-              size="sm"
-              onClick={() => handleButtonAction(() => handleSlatPosition(20), 'slat-20')}
-              disabled={isLoading}
-              className="min-h-[44px] touch-manipulation text-xs px-1"
-            >
-              {pendingAction === 'slat-20' ? 'Tap again' : '20%'}
-            </Button>
-            <Button
-              variant={pendingAction === 'slat-30' ? "destructive" : "outline"}
-              size="sm"
-              onClick={() => handleButtonAction(() => handleSlatPosition(30), 'slat-30')}
-              disabled={isLoading}
-              className="min-h-[44px] touch-manipulation text-xs px-1"
-            >
-              {pendingAction === 'slat-30' ? 'Tap again' : '30%'}
-            </Button>
-            <Button
-              variant={pendingAction === 'slat-40' ? "destructive" : "outline"}
-              size="sm"
-              onClick={() => handleButtonAction(() => handleSlatPosition(40), 'slat-40')}
-              disabled={isLoading}
-              className="min-h-[44px] touch-manipulation text-xs px-1"
-            >
-              {pendingAction === 'slat-40' ? 'Tap again' : '40%'}
-            </Button>
-            <Button
-              variant={pendingAction === 'slat-50' ? "destructive" : "outline"}
-              size="sm"
-              onClick={() => handleButtonAction(() => handleSlatPosition(50), 'slat-50')}
-              disabled={isLoading}
-              className="min-h-[44px] touch-manipulation text-xs px-1"
-            >
-              {pendingAction === 'slat-50' ? 'Tap again' : '50%'}
-            </Button>
-          </div>
-        </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Slat Control</p>
+              <div className="grid grid-cols-4 gap-2">
+                <Button
+                  variant={pendingAction === 'slat-20' ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={() => handleButtonAction(() => handleSlatPosition(20), 'slat-20')}
+                  disabled={isLoading}
+                  className="min-h-[44px] touch-manipulation text-xs px-1"
+                >
+                  {pendingAction === 'slat-20' ? 'Tap again' : '20%'}
+                </Button>
+                <Button
+                  variant={pendingAction === 'slat-30' ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={() => handleButtonAction(() => handleSlatPosition(30), 'slat-30')}
+                  disabled={isLoading}
+                  className="min-h-[44px] touch-manipulation text-xs px-1"
+                >
+                  {pendingAction === 'slat-30' ? 'Tap again' : '30%'}
+                </Button>
+                <Button
+                  variant={pendingAction === 'slat-40' ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={() => handleButtonAction(() => handleSlatPosition(40), 'slat-40')}
+                  disabled={isLoading}
+                  className="min-h-[44px] touch-manipulation text-xs px-1"
+                >
+                  {pendingAction === 'slat-40' ? 'Tap again' : '40%'}
+                </Button>
+                <Button
+                  variant={pendingAction === 'slat-50' ? "destructive" : "outline"}
+                  size="sm"
+                  onClick={() => handleButtonAction(() => handleSlatPosition(50), 'slat-50')}
+                  disabled={isLoading}
+                  className="min-h-[44px] touch-manipulation text-xs px-1"
+                >
+                  {pendingAction === 'slat-50' ? 'Tap again' : '50%'}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   );

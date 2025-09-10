@@ -10,7 +10,7 @@ import (
 )
 
 func (s *ShadingActor) Apply(command commands.LLCommand) {
-	logger.Info("Applying command", s.Name, "action", command.Action, "position", command.Position)
+	logger.Info("Applying command", s.Name, "action", command.Action, "position", command.Position, "device_type", s.DeviceType)
 
 	switch command.Action {
 	case commands.LLActionSet:
@@ -21,8 +21,16 @@ func (s *ShadingActor) Apply(command commands.LLCommand) {
 			logger.Info("Set position command completed", s.Name, "position", command.Position)
 		}
 	case commands.LLActionTilt:
+		if s.IsRollerShutter() {
+			logger.Info("Ignoring tilt command for roller shutter", s.Name)
+			return
+		}
 		s.Tilt(command.Position)
 	case commands.LLActionSlat:
+		if s.IsRollerShutter() {
+			logger.Info("Ignoring slat command for roller shutter", s.Name)
+			return
+		}
 		s.SlatOnly(command.Position)
 	}
 

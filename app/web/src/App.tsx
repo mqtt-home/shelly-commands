@@ -227,11 +227,11 @@ export function App() {
             </div>
           </div>
 
-          {actors.length > 1 && (
+          {actors.length > 1 && actors.some(actor => actor.deviceType === 'blinds') && (
             <Card className="mb-4 sm:mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Global Controls</span>
+                  <span>Global Blinds Controls</span>
                   {globalSafeMode && (
                     <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
                       Safe Mode ON
@@ -239,7 +239,7 @@ export function App() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Control all actors at once
+                  Control all blinds at once
                   {globalSafeMode && (
                     <span className="block text-xs text-blue-600 mt-1">
                       Double tap buttons to execute
