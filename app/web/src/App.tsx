@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { ActorStatus } from '@/types/actor';
-import { API_BASE, fetchActors, tiltAllActors } from '@/lib/api';
+import { API_BASE, fetchActors, tiltAllActors, setAllActorsPosition } from '@/lib/api';
 import { useSSE } from '@/hooks/useSSE';
 import { ActorCard } from '@/components/ActorCard';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -110,6 +110,16 @@ export function App() {
     } catch (error) {
       console.error('Failed to tilt all actors:', error);
       alert('Failed to tilt all actors. Please try again.');
+    }
+  };
+
+  const handleSetAllPosition = async (position: number) => {
+    try {
+      await setAllActorsPosition(position);
+      // SSE will automatically update the UI, no need to manually refresh
+    } catch (error) {
+      console.error('Failed to set position for all actors:', error);
+      alert('Failed to set position for all actors. Please try again.');
     }
   };
 
@@ -227,11 +237,11 @@ export function App() {
             </div>
           </div>
 
-          {actors.length > 1 && actors.some(actor => actor.deviceType === 'blinds') && (
+          {actors.length > 1 && (
             <Card className="mb-4 sm:mb-6">
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
-                  <span>Global Blinds Controls</span>
+                  <span>Global Controls</span>
                   {globalSafeMode && (
                     <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
                       Safe Mode ON
@@ -239,7 +249,7 @@ export function App() {
                   )}
                 </CardTitle>
                 <CardDescription>
-                  Control all blinds at once
+                  Control all blinds and shutters at once
                   {globalSafeMode && (
                     <span className="block text-xs text-blue-600 mt-1">
                       Double tap buttons to execute
@@ -253,21 +263,50 @@ export function App() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="flex gap-3 flex-wrap">
-                  <Button
-                    variant={pendingGlobalAction === 'tilt-all-closed' ? "destructive" : "secondary"}
-                    onClick={() => handleGlobalAction(() => handleTiltAll(0), 'tilt-all-closed')}
-                    className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
-                  >
-                    {pendingGlobalAction === 'tilt-all-closed' ? 'Tap again' : 'Tilt All Closed'}
-                  </Button>
-                  <Button
-                    variant={pendingGlobalAction === 'tilt-all-half' ? "destructive" : "secondary"}
-                    onClick={() => handleGlobalAction(() => handleTiltAll(50), 'tilt-all-half')}
-                    className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
-                  >
-                    {pendingGlobalAction === 'tilt-all-half' ? 'Tap again' : 'Tilt All Half'}
-                  </Button>
+                <div className="space-y-4">
+                  {/* Position Controls */}
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Position</h4>
+                    <div className="flex gap-3 flex-wrap">
+                      <Button
+                        variant={pendingGlobalAction === 'close-all' ? "destructive" : "secondary"}
+                        onClick={() => handleGlobalAction(() => handleSetAllPosition(0), 'close-all')}
+                        className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
+                      >
+                        {pendingGlobalAction === 'close-all' ? 'Tap again' : 'Close All'}
+                      </Button>
+                      <Button
+                        variant={pendingGlobalAction === 'open-all' ? "destructive" : "secondary"}
+                        onClick={() => handleGlobalAction(() => handleSetAllPosition(100), 'open-all')}
+                        className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
+                      >
+                        {pendingGlobalAction === 'open-all' ? 'Tap again' : 'Open All'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Tilt Controls for Blinds */}
+                  {actors.some(actor => actor.deviceType === 'blinds') && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Tilt (Blinds only)</h4>
+                      <div className="flex gap-3 flex-wrap">
+                        <Button
+                          variant={pendingGlobalAction === 'tilt-all-closed' ? "destructive" : "secondary"}
+                          onClick={() => handleGlobalAction(() => handleTiltAll(0), 'tilt-all-closed')}
+                          className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
+                        >
+                          {pendingGlobalAction === 'tilt-all-closed' ? 'Tap again' : 'Tilt All Closed'}
+                        </Button>
+                        <Button
+                          variant={pendingGlobalAction === 'tilt-all-half' ? "destructive" : "secondary"}
+                          onClick={() => handleGlobalAction(() => handleTiltAll(50), 'tilt-all-half')}
+                          className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
+                        >
+                          {pendingGlobalAction === 'tilt-all-half' ? 'Tap again' : 'Tilt All Half'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -289,6 +328,7 @@ export function App() {
               <ActorCard
                 key={actor.name}
                 actor={actor}
+                globalSafeMode={globalSafeMode}
               />
             ))}
           </div>

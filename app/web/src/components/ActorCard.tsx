@@ -4,23 +4,17 @@ import { setActorPosition, tiltActor, setSlatPosition } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { ChevronUp, ChevronDown, RotateCcw, Lock } from 'lucide-react';
+import { ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 
 interface ActorCardProps {
   actor: ActorStatus;
+  globalSafeMode: boolean;
   onRefresh?: () => void;
 }
 
-// Function to detect mobile devices
-const isMobileDevice = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-         (window.innerWidth <= 768);
-};
-
-export function ActorCard({ actor, onRefresh }: ActorCardProps) {
+export function ActorCard({ actor, globalSafeMode, onRefresh }: ActorCardProps) {
   const [position, setPosition] = useState(actor.position);
   const [isLoading, setIsLoading] = useState(false);
-  const [safeModeEnabled, setSafeModeEnabled] = useState(isMobileDevice());
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [pendingTimeout, setPendingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -33,24 +27,6 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
       setIsDragging(false); // Reset dragging state when position updates from server
     }
   }, [actor.position, isLoading]);
-
-  // Auto-enable safe mode on mobile device detection changes
-  useEffect(() => {
-    const handleResize = () => {
-      const isMobile = isMobileDevice();
-      if (isMobile && !safeModeEnabled) {
-        setSafeModeEnabled(true);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, [safeModeEnabled]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -108,7 +84,7 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
   };
 
   const handleButtonAction = async (action: () => Promise<void>, actionName: string) => {
-    if (safeModeEnabled) {
+    if (globalSafeMode) {
       if (pendingAction === actionName) {
         // Execute the action if it's the second tap
         clearPendingAction();
@@ -141,11 +117,6 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
     }
   };
 
-  const toggleSafeMode = () => {
-    setSafeModeEnabled(!safeModeEnabled);
-    clearPendingAction();
-  };
-
   const handleSliderChange = (values: number[]) => {
     // Only update the visual preview, don't execute the command
     setPosition(values[0]);
@@ -166,15 +137,6 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
         <CardTitle className="flex items-center justify-between leading-tight">
           <span className="truncate">{actor.displayName}</span>
           <div className="flex items-center gap-1 ml-2">
-            <Button
-              variant={safeModeEnabled ? "default" : "ghost"}
-              size="icon"
-              onClick={toggleSafeMode}
-              className="h-8 w-8 shrink-0"
-              title={safeModeEnabled ? "Safe mode ON - Double tap to execute" : "Safe mode OFF - Single tap to execute"}
-            >
-              <Lock className="h-4 w-4" />
-            </Button>
             {onRefresh && (
               <Button
                 variant="ghost"
@@ -193,14 +155,9 @@ export function ActorCard({ actor, onRefresh }: ActorCardProps) {
           <span className="text-xs text-muted-foreground ml-2">
             {actor.deviceType === 'rollershutter' ? 'Roller Shutter' : 'Blinds'}
           </span>
-          {safeModeEnabled && (
+          {globalSafeMode && (
             <div className="text-xs text-blue-600 mt-1">
               Safe Mode: Double tap buttons to execute
-              {isMobileDevice() && (
-                <span className="text-xs text-muted-foreground block">
-                  (Auto-enabled on mobile)
-                </span>
-              )}
             </div>
           )}
         </CardDescription>
