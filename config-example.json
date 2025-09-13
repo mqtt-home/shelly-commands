@@ -15,6 +15,17 @@
                 "topicBase": "shelly/eg/esszimmer/rechts",
                 "deviceType": "blinds",
                 "rank": 1,
+                "groupId": "dining-room",
+                "blindsConfig": {
+                    "TiltPercentage": 40
+                }
+            },
+            {
+                "name": "dining-room-left",
+                "topicBase": "shelly/eg/esszimmer/links",
+                "deviceType": "blinds",
+                "rank": 2,
+                "groupId": "dining-room",
                 "blindsConfig": {
                     "TiltPercentage": 40
                 }
@@ -23,7 +34,7 @@
                 "name": "living-room-roller",
                 "topicBase": "shelly/eg/wohnzimmer/roller",
                 "deviceType": "rollershutter",
-                "rank": 2
+                "rank": 10
             }
         ]
     },

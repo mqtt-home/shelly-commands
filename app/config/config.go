@@ -40,6 +40,7 @@ type Device struct {
 	DeviceType   DeviceType   `json:"deviceType,omitempty"`
 	BlindsConfig BlindsConfig `json:"blindsConfig"`
 	Rank         int          `json:"rank,omitempty"`
+	GroupID      string       `json:"groupId,omitempty"`
 }
 
 func (d *Device) String() string {

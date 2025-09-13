@@ -21,6 +21,7 @@ type ShadingActor struct {
 	TiltPosition int
 	Position     int
 	Rank         int
+	GroupID      string
 	mu           sync.Mutex
 }
 
@@ -33,6 +34,7 @@ func NewShadingActor(device config.Device) *ShadingActor {
 		DeviceType: device.DeviceType,
 		Tilted:     false,
 		Rank:       device.Rank,
+		GroupID:    device.GroupID,
 	}
 	err := actor.init()
 	if err != nil {

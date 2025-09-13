@@ -1,12 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
-import { ActorStatus } from '@/types/actor';
-import { API_BASE, fetchActors, tiltAllActors, setAllActorsPosition } from '@/lib/api';
+import { ActorStatus, GroupInfo } from '@/types/actor';
+import { API_BASE, fetchActors, fetchGroups, tiltAllActors, setAllActorsPosition } from '@/lib/api';
 import { useSSE } from '@/hooks/useSSE';
 import { ActorCard } from '@/components/ActorCard';
+import { GroupCard } from '@/components/GroupCard';
+import { GroupDialog } from '@/components/GroupDialog';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, Home, Shield } from 'lucide-react';
+import { RefreshCw, Home, Shield, Users, User } from 'lucide-react';
 
 // Function to detect mobile devices
 const isMobileDevice = () => {
@@ -16,6 +18,9 @@ const isMobileDevice = () => {
 
 export function App() {
   const [actors, setActors] = useState<ActorStatus[]>([]);
+  const [groups, setGroups] = useState<GroupInfo[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<GroupInfo | null>(null);
+  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [globalSafeMode, setGlobalSafeMode] = useState(isMobileDevice());
@@ -69,12 +74,37 @@ export function App() {
     }
   };
 
+  const loadGroups = async () => {
+    try {
+      const data = await fetchGroups();
+      setGroups(data || []); // Ensure we always set an array
+    } catch (err) {
+      console.error('Error loading groups:', err);
+      setGroups([]); // Set empty array on error
+    }
+  };
+
+  const handleShowGroupDetails = (group: GroupInfo) => {
+    setSelectedGroup(group);
+    setIsGroupDialogOpen(true);
+  };
+
+  const handleCloseGroupDialog = () => {
+    setIsGroupDialogOpen(false);
+    setSelectedGroup(null);
+  };
+
   // Fallback: load actors initially if SSE is not connected or hasn't received data yet
   useEffect(() => {
     if (!isConnected && isLoading) {
       loadActors();
     }
   }, [isConnected, isLoading]);
+
+  // Load groups data
+  useEffect(() => {
+    loadGroups();
+  }, [actors]); // Reload groups when actors change
 
   // Cleanup global timeout on unmount
   useEffect(() => {
@@ -323,22 +353,73 @@ export function App() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {actors.sort((a, b) => {
-              // Sort by rank first (ascending), then by name (alphabetically)
-              if (a.rank !== b.rank) {
-                return a.rank - b.rank;
-              }
-              return a.name.localeCompare(b.name);
-            }).map((actor) => (
-              <ActorCard
-                key={actor.name}
-                actor={actor}
-                globalSafeMode={globalSafeMode}
-              />
-            ))}
+          <div className="space-y-6">
+            {/* Groups Section */}
+            {groups && groups.length > 0 && (
+              <div>
+                <h2 className="flex items-center gap-2 text-xl font-semibold mb-4">
+                  <Users className="h-5 w-5 text-blue-600" />
+                  Groups ({groups.length})
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  {groups.map((group) => (
+                    <GroupCard
+                      key={group.groupId}
+                      group={group}
+                      globalSafeMode={globalSafeMode}
+                      onShowDetails={handleShowGroupDetails}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Individual Actors Section */}
+            {(() => {
+              const individualActors = actors.filter(actor => !actor.groupId || actor.groupId === '');
+              return individualActors.length > 0 && (
+                <div>
+                  <h2 className="flex items-center gap-2 text-xl font-semibold mb-4">
+                    <User className="h-5 w-5 text-green-600" />
+                    Individual Actors ({individualActors.length})
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                    {individualActors.sort((a, b) => {
+                      // Sort by rank first (ascending), then by name (alphabetically)
+                      if (a.rank !== b.rank) {
+                        return a.rank - b.rank;
+                      }
+                      return a.name.localeCompare(b.name);
+                    }).map((actor) => (
+                      <ActorCard
+                        key={actor.name}
+                        actor={actor}
+                        globalSafeMode={globalSafeMode}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Show message if all actors are grouped */}
+            {groups && groups.length > 0 && actors.filter(actor => !actor.groupId || actor.groupId === '').length === 0 && (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground">All actors are organized in groups above.</p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
+
+        {/* Group Dialog */}
+        <GroupDialog
+          group={selectedGroup}
+          isOpen={isGroupDialogOpen}
+          onClose={handleCloseGroupDialog}
+          globalSafeMode={globalSafeMode}
+        />
       </div>
     </div>
   );

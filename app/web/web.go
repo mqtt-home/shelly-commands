@@ -43,6 +43,7 @@ type ActorStatus struct {
 	TiltPosition int    `json:"tiltPosition"`
 	DeviceType   string `json:"deviceType"`
 	Rank         int    `json:"rank"`
+	GroupID      string `json:"groupId"`
 }
 
 type TiltRequest struct {
@@ -88,6 +89,10 @@ func (ws *WebServer) setupRoutes() {
 		r.Post("/actors/all/position", ws.setAllActorsPosition)
 		r.Post("/actors/all/tilt", ws.tiltAllActors)
 		r.Post("/actors/all/slat", ws.setSlatPositionAll)
+		r.Get("/groups", ws.getAllGroups)
+		r.Post("/groups/{groupId}/position", ws.setGroupPosition)
+		r.Post("/groups/{groupId}/tilt", ws.tiltGroup)
+		r.Post("/groups/{groupId}/slat", ws.setSlatPositionGroup)
 		r.Get("/events", ws.handleSSE)
 	})
 
@@ -137,6 +142,7 @@ func (ws *WebServer) getAllActors(w http.ResponseWriter, r *http.Request) {
 			TiltPosition: actor.TiltPosition,
 			DeviceType:   string(actor.DeviceType),
 			Rank:         actor.Rank,
+			GroupID:      actor.GroupID,
 		}
 		actors = append(actors, status)
 	}
@@ -171,6 +177,7 @@ func (ws *WebServer) getActor(w http.ResponseWriter, r *http.Request) {
 		TiltPosition: actor.TiltPosition,
 		DeviceType:   string(actor.DeviceType),
 		Rank:         actor.Rank,
+		GroupID:      actor.GroupID,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -408,6 +415,210 @@ func (ws *WebServer) setAllActorsPosition(w http.ResponseWriter, r *http.Request
 	})
 }
 
+// Group-related types and handlers
+type GroupInfo struct {
+	GroupID    string        `json:"groupId"`
+	Name       string        `json:"name"`
+	ActorCount int           `json:"actorCount"`
+	Actors     []ActorStatus `json:"actors"`
+}
+
+func (ws *WebServer) getAllGroups(w http.ResponseWriter, r *http.Request) {
+	groupMap := make(map[string]*GroupInfo)
+
+	// Collect all actors and group them
+	for _, actor := range ws.registry.Actors {
+		if actor.GroupID == "" {
+			continue // Skip actors without group
+		}
+
+		// Get current position
+		position, err := actor.GetPosition()
+		if err != nil {
+			logger.Error("Failed to get position for actor", actor.Name, err)
+			position = actor.Position // fallback to cached position
+		}
+
+		status := ActorStatus{
+			Name:         actor.Name,
+			DisplayName:  actor.DisplayName(),
+			IP:           actor.TopicBase,
+			Serial:       actor.Serial,
+			Position:     position,
+			Tilted:       actor.Tilted,
+			TiltPosition: actor.TiltPosition,
+			DeviceType:   string(actor.DeviceType),
+			Rank:         actor.Rank,
+			GroupID:      actor.GroupID,
+		}
+
+		if group, exists := groupMap[actor.GroupID]; exists {
+			group.Actors = append(group.Actors, status)
+			group.ActorCount++
+		} else {
+			groupMap[actor.GroupID] = &GroupInfo{
+				GroupID:    actor.GroupID,
+				Name:       actor.GroupID, // Use GroupID as name for now
+				ActorCount: 1,
+				Actors:     []ActorStatus{status},
+			}
+		}
+	}
+
+	// Convert map to slice
+	var groups []GroupInfo
+	for _, group := range groupMap {
+		groups = append(groups, *group)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(groups)
+}
+
+func (ws *WebServer) setGroupPosition(w http.ResponseWriter, r *http.Request) {
+	groupID := chi.URLParam(r, "groupId")
+
+	var req SetPositionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Position < 0 || req.Position > 100 {
+		http.Error(w, "Position must be between 0 and 100", http.StatusBadRequest)
+		return
+	}
+
+	command := commands.LLCommand{
+		Action:   commands.LLActionSet,
+		Position: req.Position,
+	}
+
+	affectedCount := 0
+	for _, actor := range ws.registry.Actors {
+		if actor.GroupID == groupID {
+			go actor.Apply(command)
+			affectedCount++
+		}
+	}
+
+	if affectedCount == 0 {
+		http.Error(w, fmt.Sprintf("No actors found in group '%s'", groupID), http.StatusNotFound)
+		return
+	}
+
+	logger.Info(fmt.Sprintf("Set position for %d actors in group %s to %d", affectedCount, groupID, req.Position))
+
+	// Broadcast state change after a brief delay to allow the actors to update
+	go func() {
+		time.Sleep(1 * time.Second)
+		ws.broadcastStateChange()
+	}()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"count":  affectedCount,
+		"group":  groupID,
+	})
+}
+
+func (ws *WebServer) tiltGroup(w http.ResponseWriter, r *http.Request) {
+	groupID := chi.URLParam(r, "groupId")
+
+	var req TiltRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Position < 0 || req.Position > 100 {
+		http.Error(w, "Position must be between 0 and 100", http.StatusBadRequest)
+		return
+	}
+
+	command := commands.LLCommand{
+		Action:   commands.LLActionTilt,
+		Position: req.Position,
+	}
+
+	affectedCount := 0
+	for _, actor := range ws.registry.Actors {
+		if actor.GroupID == groupID {
+			go actor.Apply(command)
+			affectedCount++
+		}
+	}
+
+	if affectedCount == 0 {
+		http.Error(w, fmt.Sprintf("No actors found in group '%s'", groupID), http.StatusNotFound)
+		return
+	}
+
+	logger.Info(fmt.Sprintf("Tilt %d actors in group %s to position %d", affectedCount, groupID, req.Position))
+
+	// Broadcast state change after a brief delay to allow the actors to update
+	go func() {
+		time.Sleep(1 * time.Second)
+		ws.broadcastStateChange()
+	}()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"count":  affectedCount,
+		"group":  groupID,
+	})
+}
+
+func (ws *WebServer) setSlatPositionGroup(w http.ResponseWriter, r *http.Request) {
+	groupID := chi.URLParam(r, "groupId")
+
+	var req TiltRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Position < 0 || req.Position > 100 {
+		http.Error(w, "Position must be between 0 and 100", http.StatusBadRequest)
+		return
+	}
+
+	command := commands.LLCommand{
+		Action:   commands.LLActionSlat,
+		Position: req.Position,
+	}
+
+	affectedCount := 0
+	for _, actor := range ws.registry.Actors {
+		if actor.GroupID == groupID {
+			go actor.Apply(command)
+			affectedCount++
+		}
+	}
+
+	if affectedCount == 0 {
+		http.Error(w, fmt.Sprintf("No actors found in group '%s'", groupID), http.StatusNotFound)
+		return
+	}
+
+	logger.Info(fmt.Sprintf("Set slat position for %d actors in group %s to %d", affectedCount, groupID, req.Position))
+
+	// Broadcast state change after a brief delay to allow the actors to update
+	go func() {
+		time.Sleep(1 * time.Second)
+		ws.broadcastStateChange()
+	}()
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status": "success",
+		"count":  affectedCount,
+		"group":  groupID,
+	})
+}
+
 func (ws *WebServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 	// Set SSE headers
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -555,6 +766,7 @@ func (ws *WebServer) getAllActorsState() []ActorStatus {
 			TiltPosition: actor.TiltPosition,
 			DeviceType:   string(actor.DeviceType),
 			Rank:         actor.Rank,
+			GroupID:      actor.GroupID,
 		}
 		actorsState = append(actorsState, state)
 	}
