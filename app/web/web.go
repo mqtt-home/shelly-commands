@@ -64,6 +64,10 @@ func NewWebServer(registry *shelly.ActorRegistry) *WebServer {
 		sseClients: make(map[string]*SSEClient),
 	}
 	ws.setupRoutes()
+	
+	// Start channel drainer to prevent channel from filling up when no web UI is connected
+	go ws.startChannelDrainer()
+	
 	return ws
 }
 
@@ -803,6 +807,41 @@ func (ws *WebServer) getAllActorsState() []ActorStatus {
 	})
 
 	return actorsState
+}
+
+// startChannelDrainer starts a background goroutine that drains the PositionChangeChan
+// when no SSE clients are connected to prevent the channel from filling up
+func (ws *WebServer) startChannelDrainer() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ticker.C:
+			// Check if there are any SSE clients connected
+			ws.sseClients_mu.RLock()
+			clientCount := len(ws.sseClients)
+			ws.sseClients_mu.RUnlock()
+			
+			// If no clients are connected, drain the channel to prevent it from filling up
+			if clientCount == 0 {
+				drained := 0
+				for {
+					select {
+					case <-shelly.PositionChangeChan:
+						drained++
+					default:
+						// Channel is empty, break the drain loop
+						if drained > 0 {
+							logger.Debug("Drained position change events (no web clients connected)", "count", drained)
+						}
+						goto nextTick
+					}
+				}
+			}
+		nextTick:
+		}
+	}
 }
 
 func (ws *WebServer) Start(port int) error {

@@ -50,7 +50,7 @@ func subscribeToCommands(cfg config.Config, actors *shelly.ActorRegistry) {
 		logger.Debug("Received MQTT command message", topic, string(payload))
 
 		targetName := topic[len(prefix) : len(topic)-len(postfix)]
-		
+
 		command, err := commands.Parse(payload)
 		if err != nil {
 			logger.Error("Failed to parse command", "topic", topic, "payload", string(payload), "error", err)
