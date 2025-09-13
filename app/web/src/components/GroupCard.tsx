@@ -145,8 +145,8 @@ export function GroupCard({ group, globalSafeMode, onShowDetails }: GroupCardPro
             disabled={isLoading}
             className="min-h-[44px] touch-manipulation text-xs"
           >
-            <ChevronUp className="mr-1 h-3 w-3" />
-            {pendingAction === 'pos-0' ? 'Tap again' : 'Open'}
+            <ChevronDown className="mr-1 h-3 w-3" />
+            {pendingAction === 'pos-0' ? 'Tap again' : 'Close'}
           </Button>
           <Button
             variant={pendingAction === 'pos-100' ? "destructive" : "outline"}
@@ -155,8 +155,8 @@ export function GroupCard({ group, globalSafeMode, onShowDetails }: GroupCardPro
             disabled={isLoading}
             className="min-h-[44px] touch-manipulation text-xs"
           >
-            <ChevronDown className="mr-1 h-3 w-3" />
-            {pendingAction === 'pos-100' ? 'Tap again' : 'Close'}
+            <ChevronUp className="mr-1 h-3 w-3" />
+            {pendingAction === 'pos-100' ? 'Tap again' : 'Open'}
           </Button>
         </div>
 

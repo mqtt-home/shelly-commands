@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"runtime"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -34,16 +35,18 @@ type WebServer struct {
 }
 
 type ActorStatus struct {
-	Name         string `json:"name"`
-	DisplayName  string `json:"displayName"`
-	IP           string `json:"ip"`
-	Serial       string `json:"serial"`
-	Position     int    `json:"position"`
-	Tilted       bool   `json:"tilted"`
-	TiltPosition int    `json:"tiltPosition"`
-	DeviceType   string `json:"deviceType"`
-	Rank         int    `json:"rank"`
-	GroupID      string `json:"groupId"`
+	Name         string   `json:"name"`
+	DisplayName  string   `json:"displayName"`
+	IP           string   `json:"ip"`
+	Serial       string   `json:"serial"`
+	Position     int      `json:"position"`
+	Tilted       bool     `json:"tilted"`
+	TiltPosition int      `json:"tiltPosition"`
+	DeviceType   string   `json:"deviceType"`
+	Rank         int      `json:"rank"`
+	GroupIDs     []string `json:"groupIds"`
+	// Deprecated: Use GroupIDs instead. Kept for backward compatibility.
+	GroupID string `json:"groupId"`
 }
 
 type TiltRequest struct {
@@ -142,10 +145,19 @@ func (ws *WebServer) getAllActors(w http.ResponseWriter, r *http.Request) {
 			TiltPosition: actor.TiltPosition,
 			DeviceType:   string(actor.DeviceType),
 			Rank:         actor.Rank,
-			GroupID:      actor.GroupID,
+			GroupIDs:     actor.GetGroupIDs(),
+			GroupID:      actor.GroupID, // Keep for backward compatibility
 		}
 		actors = append(actors, status)
 	}
+
+	// Sort actors by rank, then by name for consistent ordering
+	sort.Slice(actors, func(i, j int) bool {
+		if actors[i].Rank != actors[j].Rank {
+			return actors[i].Rank < actors[j].Rank
+		}
+		return actors[i].Name < actors[j].Name
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(actors)
@@ -177,7 +189,8 @@ func (ws *WebServer) getActor(w http.ResponseWriter, r *http.Request) {
 		TiltPosition: actor.TiltPosition,
 		DeviceType:   string(actor.DeviceType),
 		Rank:         actor.Rank,
-		GroupID:      actor.GroupID,
+		GroupIDs:     actor.GetGroupIDs(),
+		GroupID:      actor.GroupID, // Keep for backward compatibility
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -426,50 +439,62 @@ type GroupInfo struct {
 func (ws *WebServer) getAllGroups(w http.ResponseWriter, r *http.Request) {
 	groupMap := make(map[string]*GroupInfo)
 
-	// Collect all actors and group them
-	for _, actor := range ws.registry.Actors {
-		if actor.GroupID == "" {
-			continue // Skip actors without group
-		}
+	// Use the registry's GetAllGroups method to get groups and their actors
+	allGroups := ws.registry.GetAllGroups()
 
-		// Get current position
-		position, err := actor.GetPosition()
-		if err != nil {
-			logger.Error("Failed to get position for actor", actor.Name, err)
-			position = actor.Position // fallback to cached position
-		}
+	for groupID, actors := range allGroups {
+		actorStatuses := make([]ActorStatus, 0, len(actors))
 
-		status := ActorStatus{
-			Name:         actor.Name,
-			DisplayName:  actor.DisplayName(),
-			IP:           actor.TopicBase,
-			Serial:       actor.Serial,
-			Position:     position,
-			Tilted:       actor.Tilted,
-			TiltPosition: actor.TiltPosition,
-			DeviceType:   string(actor.DeviceType),
-			Rank:         actor.Rank,
-			GroupID:      actor.GroupID,
-		}
-
-		if group, exists := groupMap[actor.GroupID]; exists {
-			group.Actors = append(group.Actors, status)
-			group.ActorCount++
-		} else {
-			groupMap[actor.GroupID] = &GroupInfo{
-				GroupID:    actor.GroupID,
-				Name:       actor.GroupID, // Use GroupID as name for now
-				ActorCount: 1,
-				Actors:     []ActorStatus{status},
+		for _, actor := range actors {
+			// Get current position
+			position, err := actor.GetPosition()
+			if err != nil {
+				logger.Error("Failed to get position for actor", actor.Name, err)
+				position = actor.Position // fallback to cached position
 			}
+
+			status := ActorStatus{
+				Name:         actor.Name,
+				DisplayName:  actor.DisplayName(),
+				IP:           actor.TopicBase,
+				Serial:       actor.Serial,
+				Position:     position,
+				Tilted:       actor.Tilted,
+				TiltPosition: actor.TiltPosition,
+				DeviceType:   string(actor.DeviceType),
+				Rank:         actor.Rank,
+				GroupIDs:     actor.GetGroupIDs(),
+				GroupID:      actor.GroupID, // Keep for backward compatibility
+			}
+			actorStatuses = append(actorStatuses, status)
+		}
+
+		// Sort actors within the group by rank, then by name
+		sort.Slice(actorStatuses, func(i, j int) bool {
+			if actorStatuses[i].Rank != actorStatuses[j].Rank {
+				return actorStatuses[i].Rank < actorStatuses[j].Rank
+			}
+			return actorStatuses[i].Name < actorStatuses[j].Name
+		})
+
+		groupMap[groupID] = &GroupInfo{
+			GroupID:    groupID,
+			Name:       groupID, // Use GroupID as name for now
+			ActorCount: len(actors),
+			Actors:     actorStatuses,
 		}
 	}
 
-	// Convert map to slice
+	// Convert map to slice and sort groups by name
 	var groups []GroupInfo
 	for _, group := range groupMap {
 		groups = append(groups, *group)
 	}
+
+	// Sort groups by GroupID (name) for consistent ordering
+	sort.Slice(groups, func(i, j int) bool {
+		return groups[i].GroupID < groups[j].GroupID
+	})
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(groups)
@@ -494,20 +519,19 @@ func (ws *WebServer) setGroupPosition(w http.ResponseWriter, r *http.Request) {
 		Position: req.Position,
 	}
 
-	affectedCount := 0
-	for _, actor := range ws.registry.Actors {
-		if actor.GroupID == groupID {
-			go actor.Apply(command)
-			affectedCount++
-		}
-	}
+	// Use the registry's GetActorsByGroup method
+	groupActors := ws.registry.GetActorsByGroup(groupID)
 
-	if affectedCount == 0 {
+	if len(groupActors) == 0 {
 		http.Error(w, fmt.Sprintf("No actors found in group '%s'", groupID), http.StatusNotFound)
 		return
 	}
 
-	logger.Info(fmt.Sprintf("Set position for %d actors in group %s to %d", affectedCount, groupID, req.Position))
+	for _, actor := range groupActors {
+		go actor.Apply(command)
+	}
+
+	logger.Info(fmt.Sprintf("Set position for %d actors in group %s to %d", len(groupActors), groupID, req.Position))
 
 	// Broadcast state change after a brief delay to allow the actors to update
 	go func() {
@@ -518,7 +542,7 @@ func (ws *WebServer) setGroupPosition(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "success",
-		"count":  affectedCount,
+		"count":  len(groupActors),
 		"group":  groupID,
 	})
 }
@@ -542,20 +566,19 @@ func (ws *WebServer) tiltGroup(w http.ResponseWriter, r *http.Request) {
 		Position: req.Position,
 	}
 
-	affectedCount := 0
-	for _, actor := range ws.registry.Actors {
-		if actor.GroupID == groupID {
-			go actor.Apply(command)
-			affectedCount++
-		}
-	}
+	// Use the registry's GetActorsByGroup method
+	groupActors := ws.registry.GetActorsByGroup(groupID)
 
-	if affectedCount == 0 {
+	if len(groupActors) == 0 {
 		http.Error(w, fmt.Sprintf("No actors found in group '%s'", groupID), http.StatusNotFound)
 		return
 	}
 
-	logger.Info(fmt.Sprintf("Tilt %d actors in group %s to position %d", affectedCount, groupID, req.Position))
+	for _, actor := range groupActors {
+		go actor.Apply(command)
+	}
+
+	logger.Info(fmt.Sprintf("Tilt %d actors in group %s to position %d", len(groupActors), groupID, req.Position))
 
 	// Broadcast state change after a brief delay to allow the actors to update
 	go func() {
@@ -566,7 +589,7 @@ func (ws *WebServer) tiltGroup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "success",
-		"count":  affectedCount,
+		"count":  len(groupActors),
 		"group":  groupID,
 	})
 }
@@ -590,20 +613,19 @@ func (ws *WebServer) setSlatPositionGroup(w http.ResponseWriter, r *http.Request
 		Position: req.Position,
 	}
 
-	affectedCount := 0
-	for _, actor := range ws.registry.Actors {
-		if actor.GroupID == groupID {
-			go actor.Apply(command)
-			affectedCount++
-		}
-	}
+	// Use the registry's GetActorsByGroup method
+	groupActors := ws.registry.GetActorsByGroup(groupID)
 
-	if affectedCount == 0 {
+	if len(groupActors) == 0 {
 		http.Error(w, fmt.Sprintf("No actors found in group '%s'", groupID), http.StatusNotFound)
 		return
 	}
 
-	logger.Info(fmt.Sprintf("Set slat position for %d actors in group %s to %d", affectedCount, groupID, req.Position))
+	for _, actor := range groupActors {
+		go actor.Apply(command)
+	}
+
+	logger.Info(fmt.Sprintf("Set slat position for %d actors in group %s to %d", len(groupActors), groupID, req.Position))
 
 	// Broadcast state change after a brief delay to allow the actors to update
 	go func() {
@@ -614,7 +636,7 @@ func (ws *WebServer) setSlatPositionGroup(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"status": "success",
-		"count":  affectedCount,
+		"count":  len(groupActors),
 		"group":  groupID,
 	})
 }
@@ -766,10 +788,19 @@ func (ws *WebServer) getAllActorsState() []ActorStatus {
 			TiltPosition: actor.TiltPosition,
 			DeviceType:   string(actor.DeviceType),
 			Rank:         actor.Rank,
-			GroupID:      actor.GroupID,
+			GroupIDs:     actor.GetGroupIDs(),
+			GroupID:      actor.GroupID, // Keep for backward compatibility
 		}
 		actorsState = append(actorsState, state)
 	}
+
+	// Sort actors by rank, then by name for consistent ordering
+	sort.Slice(actorsState, func(i, j int) bool {
+		if actorsState[i].Rank != actorsState[j].Rank {
+			return actorsState[i].Rank < actorsState[j].Rank
+		}
+		return actorsState[i].Name < actorsState[j].Name
+	})
 
 	return actorsState
 }

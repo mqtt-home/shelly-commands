@@ -42,6 +42,7 @@ func subscribeToCommands(cfg config.Config, actors *shelly.ActorRegistry) {
 	prefix := cfg.MQTT.Topic + "/"
 	postfix := "/set"
 
+	// Subscribe to individual actor commands
 	logger.Info("Subscribing to MQTT commands", "pattern", prefix+"+"+postfix)
 
 	mqtt.Subscribe(prefix+"+"+postfix, func(topic string, payload []byte) {
@@ -71,6 +72,49 @@ func subscribeToCommands(cfg config.Config, actors *shelly.ActorRegistry) {
 			}()
 			actor.Apply(command)
 		}()
+	})
+
+	// Subscribe to group commands
+	groupPattern := prefix + "group:+" + postfix
+	logger.Info("Subscribing to MQTT group commands", "pattern", groupPattern)
+
+	mqtt.Subscribe(groupPattern, func(topic string, payload []byte) {
+		logger.Debug("Received MQTT group command message", topic, string(payload))
+
+		// Extract group ID from topic: prefix + "group:" + groupID + postfix
+		groupPrefix := prefix + "group:"
+		if len(topic) <= len(groupPrefix)+len(postfix) {
+			logger.Error("Invalid group command topic", "topic", topic)
+			return
+		}
+
+		groupID := topic[len(groupPrefix) : len(topic)-len(postfix)]
+		groupActors := actors.GetActorsByGroup(groupID)
+
+		if len(groupActors) == 0 {
+			logger.Error("No actors found for group", "topic", topic, "group_id", groupID)
+			return
+		}
+
+		command, err := commands.Parse(payload)
+		if err != nil {
+			logger.Error("Failed to parse group command", "topic", topic, "payload", string(payload), "error", err)
+			return
+		}
+
+		logger.Info("Processing group command", "group", groupID, "actor_count", len(groupActors), "action", command.Action, "position", command.Position)
+
+		// Run command on all actors in the group
+		for _, actor := range groupActors {
+			go func(a *shelly.ShadingActor) {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("Panic in group command processing", "actor", a.Name, "group", groupID, "panic", r)
+					}
+				}()
+				a.Apply(command)
+			}(actor)
+		}
 	})
 }
 

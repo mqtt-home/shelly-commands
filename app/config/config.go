@@ -40,7 +40,9 @@ type Device struct {
 	DeviceType   DeviceType   `json:"deviceType,omitempty"`
 	BlindsConfig BlindsConfig `json:"blindsConfig"`
 	Rank         int          `json:"rank,omitempty"`
-	GroupID      string       `json:"groupId,omitempty"`
+	GroupIDs     []string     `json:"groupIds,omitempty"`
+	// Deprecated: Use GroupIDs instead. Kept for backward compatibility.
+	GroupID string `json:"groupId,omitempty"`
 }
 
 func (d *Device) String() string {
@@ -53,6 +55,32 @@ func (d *Device) IsRollerShutter() bool {
 
 func (d *Device) IsBlinds() bool {
 	return d.DeviceType == DeviceTypeBlinds
+}
+
+// GetGroupIDs returns all group IDs for this device, including the deprecated GroupID field
+func (d *Device) GetGroupIDs() []string {
+	var groups []string
+
+	// Add new GroupIDs if any
+	if len(d.GroupIDs) > 0 {
+		groups = append(groups, d.GroupIDs...)
+	}
+
+	// Add deprecated GroupID if it exists and isn't already in GroupIDs
+	if d.GroupID != "" {
+		found := false
+		for _, group := range groups {
+			if group == d.GroupID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			groups = append(groups, d.GroupID)
+		}
+	}
+
+	return groups
 }
 
 type Shelly struct {

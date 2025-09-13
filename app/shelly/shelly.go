@@ -21,11 +21,14 @@ type ShadingActor struct {
 	TiltPosition int
 	Position     int
 	Rank         int
-	GroupID      string
-	mu           sync.Mutex
+	GroupIDs     []string
+	// Deprecated: Use GroupIDs instead. Kept for backward compatibility.
+	GroupID string
+	mu      sync.Mutex
 }
 
 func NewShadingActor(device config.Device) *ShadingActor {
+	groupIDs := device.GetGroupIDs()
 	actor := &ShadingActor{
 		device:     device,
 		Name:       device.Name,
@@ -34,7 +37,8 @@ func NewShadingActor(device config.Device) *ShadingActor {
 		DeviceType: device.DeviceType,
 		Tilted:     false,
 		Rank:       device.Rank,
-		GroupID:    device.GroupID,
+		GroupIDs:   groupIDs,
+		GroupID:    device.GroupID, // Keep for backward compatibility
 	}
 	err := actor.init()
 	if err != nil {
@@ -61,6 +65,21 @@ func (s *ShadingActor) IsRollerShutter() bool {
 
 func (s *ShadingActor) IsBlinds() bool {
 	return s.DeviceType == config.DeviceTypeBlinds
+}
+
+// GetGroupIDs returns all group IDs for this actor
+func (s *ShadingActor) GetGroupIDs() []string {
+	return s.GroupIDs
+}
+
+// IsInGroup checks if the actor belongs to the specified group
+func (s *ShadingActor) IsInGroup(groupID string) bool {
+	for _, group := range s.GroupIDs {
+		if group == groupID {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *ShadingActor) Start() error {

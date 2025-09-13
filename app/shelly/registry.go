@@ -51,3 +51,33 @@ func (r *ActorRegistry) GetAllActors() []*ShadingActor {
 	}
 	return actors
 }
+
+// GetActorsByGroup returns all actors that belong to the specified group
+func (r *ActorRegistry) GetActorsByGroup(groupID string) []*ShadingActor {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var actors []*ShadingActor
+	for _, actor := range r.Actors {
+		if actor.IsInGroup(groupID) {
+			actors = append(actors, actor)
+		}
+	}
+	return actors
+}
+
+// GetAllGroups returns a map of group IDs to the list of actors in each group
+func (r *ActorRegistry) GetAllGroups() map[string][]*ShadingActor {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	groups := make(map[string][]*ShadingActor)
+	for _, actor := range r.Actors {
+		for _, groupID := range actor.GetGroupIDs() {
+			if groupID != "" {
+				groups[groupID] = append(groups[groupID], actor)
+			}
+		}
+	}
+	return groups
+}
