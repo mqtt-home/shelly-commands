@@ -103,12 +103,119 @@ Topic: `home/shelly/<device-name>/set`
 
 This will move the position to 50% and then tilt the blinds.
 
+### Slat control (for blinds only)
+
+Topic: `home/shelly/<device-name>/set`
+
+```json
+{
+  "action": "slat",
+  "position": 75
+}
+```
+
+This will set the slat/tilt position directly without changing the main position of the blinds.
+
+### Group commands
+
+The application supports controlling multiple devices as a group. Group commands follow the same syntax as individual device commands but use a different topic structure.
+
+Topic: `home/shelly/group:<group-id>/set`
+
+All the same actions (open, close, tilt, etc.) are supported for groups. For example:
+
+```json
+{
+  "action": "tilt",
+  "position": 50
+}
+```
+
+This will tilt all devices in the specified group to 50%.
+
+## Status Messages
+
+The application subscribes to Shelly device status updates and processes position changes automatically.
+
+### Shelly device status (received)
+
+Topic: `shelly/<topicBase>/status/cover:0`
+
+The application automatically subscribes to this topic for each configured device to receive status updates from the Shelly device.
+
+Example status message from Shelly device:
+```json
+{
+  "id": 0,
+  "source": "timer",
+  "state": "stopped",
+  "apower": 0.0,
+  "voltage": 230.1,
+  "current": 0.0,
+  "pf": 0.0,
+  "freq": 50.0,
+  "aenergy": {
+    "total": 123.456,
+    "by_minute": [0.0, 0.0, 0.0],
+    "minute_ts": 1234567890
+  },
+  "temperature": {
+    "tC": 25.5,
+    "tF": 77.9
+  },
+  "pos_control": true,
+  "last_direction": "close",
+  "current_pos": 50,
+  "slat_pos": 25
+}
+```
+
+Key fields used by the application:
+- `current_pos`: Main position of the blinds/shutter (0-100, where 0=closed, 100=open)
+- `slat_pos`: Tilt/slat position for blinds (0-100)
+
+## MQTT Command Reference
+
+### Individual Device Commands
+
+All individual device commands use the topic pattern: `<mqtt.topic>/<device-name>/set`
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| **Open** | `{"action": "open"}` | Fully open the blinds/shutter (position 100) |
+| **Close** | `{"action": "close"}` | Fully close the blinds/shutter (position 0) |
+| **Set Position** | `{"position": 50}` or `{"action": "set", "position": 50}` | Move to specific position (0-100) |
+| **Tilt** | `{"action": "tilt", "position": 50}` | Move to position and then tilt blinds |
+| **Close and Open** | `{"action": "closeAndOpenBlinds"}` | Close completely, then tilt to half-open (useful for reset) |
+| **Slat Only** | `{"action": "slat", "position": 75}` | Set slat/tilt position only (blinds only) |
+
+### Group Commands
+
+All group commands use the topic pattern: `<mqtt.topic>/group:<group-id>/set`
+
+Group commands support all the same actions as individual device commands and will be applied to all devices in the specified group simultaneously.
+
+Examples:
+- `home/shelly/group:living-room/set` - Control all devices in "living-room" group
+- `home/shelly/group:south-facing/set` - Control all devices in "south-facing" group
+
+### Low-Level Shelly Commands (sent to device)
+
+The application translates high-level commands into low-level Shelly device commands on the topic: `<topicBase>/command/cover:0`
+
+| High-Level Action | Shelly Command | Description |
+|------------------|----------------|-------------|
+| Open (position 100) | `"open"` | Shelly native open command |
+| Close (position 0) | `"close"` | Shelly native close command |
+| Set Position | `"pos,<value>"` | Move to specific position (e.g., "pos,50") |
+| Set Slat Position | `"slat_pos,<value>"` | Set slat position (e.g., "slat_pos,75") |
+| Status Update | `"status_update"` | Request current status from device |
+
 ## Configuration
 
 You can configure devices either by specifying their IP address directly or by using their serial number. If you use the serial number, the IP address will be discovered automatically using Zeroconf (mDNS/Bonjour).
 
-### Example configuration with direct IP (without Zeroconf)
-
+### Example configuration
 ```json
 {
   "mqtt": {

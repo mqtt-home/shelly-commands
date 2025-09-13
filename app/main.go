@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -42,78 +43,63 @@ func subscribeToCommands(cfg config.Config, actors *shelly.ActorRegistry) {
 	prefix := cfg.MQTT.Topic + "/"
 	postfix := "/set"
 
-	// Subscribe to individual actor commands
+	// Subscribe to all commands (both individual and group)
 	logger.Info("Subscribing to MQTT commands", "pattern", prefix+"+"+postfix)
 
 	mqtt.Subscribe(prefix+"+"+postfix, func(topic string, payload []byte) {
 		logger.Debug("Received MQTT command message", topic, string(payload))
 
-		actorName := topic[len(prefix) : len(topic)-len(postfix)]
-		actor := actors.GetActor(actorName)
-		if actor == nil {
-			logger.Error("Unknown actor in command", "topic", topic, "actor_name", actorName)
-			return
-		}
-
+		targetName := topic[len(prefix) : len(topic)-len(postfix)]
+		
 		command, err := commands.Parse(payload)
 		if err != nil {
 			logger.Error("Failed to parse command", "topic", topic, "payload", string(payload), "error", err)
 			return
 		}
 
-		logger.Info("Processing command", "actor", actorName, "action", command.Action, "position", command.Position)
+		// Check if this is a group command
+		if strings.HasPrefix(targetName, "group:") {
+			// Handle group command
+			groupID := targetName[6:] // Remove "group:" prefix
+			groupActors := actors.GetActorsByGroup(groupID)
 
-		// Run command in separate goroutine to avoid blocking MQTT processing
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("Panic in command processing", "actor", actorName, "panic", r)
-				}
-			}()
-			actor.Apply(command)
-		}()
-	})
+			if len(groupActors) == 0 {
+				logger.Error("No actors found for group", "topic", topic, "group_id", groupID)
+				return
+			}
 
-	// Subscribe to group commands
-	groupPattern := prefix + "group:+" + postfix
-	logger.Info("Subscribing to MQTT group commands", "pattern", groupPattern)
+			logger.Info("Processing group command", "group", groupID, "actor_count", len(groupActors), "action", command.Action, "position", command.Position)
 
-	mqtt.Subscribe(groupPattern, func(topic string, payload []byte) {
-		logger.Debug("Received MQTT group command message", topic, string(payload))
+			// Run command on all actors in the group
+			for _, actor := range groupActors {
+				go func(a *shelly.ShadingActor) {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Error("Panic in group command processing", "actor", a.Name, "group", groupID, "panic", r)
+						}
+					}()
+					a.Apply(command)
+				}(actor)
+			}
+		} else {
+			// Handle individual actor command
+			actor := actors.GetActor(targetName)
+			if actor == nil {
+				logger.Error("Unknown actor in command", "topic", topic, "actor_name", targetName)
+				return
+			}
 
-		// Extract group ID from topic: prefix + "group:" + groupID + postfix
-		groupPrefix := prefix + "group:"
-		if len(topic) <= len(groupPrefix)+len(postfix) {
-			logger.Error("Invalid group command topic", "topic", topic)
-			return
-		}
+			logger.Info("Processing command", "actor", targetName, "action", command.Action, "position", command.Position)
 
-		groupID := topic[len(groupPrefix) : len(topic)-len(postfix)]
-		groupActors := actors.GetActorsByGroup(groupID)
-
-		if len(groupActors) == 0 {
-			logger.Error("No actors found for group", "topic", topic, "group_id", groupID)
-			return
-		}
-
-		command, err := commands.Parse(payload)
-		if err != nil {
-			logger.Error("Failed to parse group command", "topic", topic, "payload", string(payload), "error", err)
-			return
-		}
-
-		logger.Info("Processing group command", "group", groupID, "actor_count", len(groupActors), "action", command.Action, "position", command.Position)
-
-		// Run command on all actors in the group
-		for _, actor := range groupActors {
-			go func(a *shelly.ShadingActor) {
+			// Run command in separate goroutine to avoid blocking MQTT processing
+			go func() {
 				defer func() {
 					if r := recover(); r != nil {
-						logger.Error("Panic in group command processing", "actor", a.Name, "group", groupID, "panic", r)
+						logger.Error("Panic in command processing", "actor", targetName, "panic", r)
 					}
 				}()
-				a.Apply(command)
-			}(actor)
+				actor.Apply(command)
+			}()
 		}
 	})
 }
