@@ -64,10 +64,10 @@ func NewWebServer(registry *shelly.ActorRegistry) *WebServer {
 		sseClients: make(map[string]*SSEClient),
 	}
 	ws.setupRoutes()
-	
+
 	// Start channel drainer to prevent channel from filling up when no web UI is connected
 	go ws.startChannelDrainer()
-	
+
 	return ws
 }
 
@@ -814,7 +814,7 @@ func (ws *WebServer) getAllActorsState() []ActorStatus {
 func (ws *WebServer) startChannelDrainer() {
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ticker.C:
@@ -822,7 +822,7 @@ func (ws *WebServer) startChannelDrainer() {
 			ws.sseClients_mu.RLock()
 			clientCount := len(ws.sseClients)
 			ws.sseClients_mu.RUnlock()
-			
+
 			// If no clients are connected, drain the channel to prevent it from filling up
 			if clientCount == 0 {
 				drained := 0

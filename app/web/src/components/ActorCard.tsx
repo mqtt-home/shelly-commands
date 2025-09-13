@@ -257,7 +257,7 @@ export function ActorCard({ actor, globalSafeMode, onRefresh }: ActorCardProps) 
           <>
             <div className="space-y-2">
               <p className="text-sm font-medium">Tilt Operations</p>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3">
                 <Button
                   variant={pendingAction === 'tilt-closed' ? "destructive" : "secondary"}
                   size="sm"
@@ -265,16 +265,7 @@ export function ActorCard({ actor, globalSafeMode, onRefresh }: ActorCardProps) 
                   disabled={isLoading}
                   className="min-h-[44px] touch-manipulation text-xs px-2"
                 >
-                  {pendingAction === 'tilt-closed' ? 'Tap again' : 'Closed'}
-                </Button>
-                <Button
-                  variant={pendingAction === 'tilt-half' ? "destructive" : "secondary"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handleTilt(50), 'tilt-half')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-2"
-                >
-                  {pendingAction === 'tilt-half' ? 'Tap again' : 'Half'}
+                  {pendingAction === 'tilt-closed' ? 'Tap again' : 'Tilt (Close & Tilt)'}
                 </Button>
               </div>
             </div>

@@ -208,25 +208,16 @@ export function GroupCard({ group, globalSafeMode, onShowDetails }: GroupCardPro
                   <span className="text-xs text-green-600">Some tilted</span>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 gap-2">
                 <Button
                   variant={pendingAction === 'tilt-on' ? "destructive" : "outline"}
                   size="sm"
-                  onClick={() => handleButtonAction(() => handleTilt(100), 'tilt-on')}
+                  onClick={() => handleButtonAction(() => handleTilt(0), 'tilt-on')}
                   disabled={isLoading}
                   className="min-h-[44px] touch-manipulation text-xs"
                 >
                   <RotateCcw className="mr-1 h-3 w-3" />
-                  {pendingAction === 'tilt-on' ? 'Tap again' : 'Tilt'}
-                </Button>
-                <Button
-                  variant={pendingAction === 'tilt-off' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handleTilt(0), 'tilt-off')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs"
-                >
-                  {pendingAction === 'tilt-off' ? 'Tap again' : 'Untilt'}
+                  {pendingAction === 'tilt-on' ? 'Tap again' : 'Tilt (Close & Tilt)'}
                 </Button>
               </div>
             </div>

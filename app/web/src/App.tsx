@@ -322,17 +322,17 @@ export function App() {
                       <div className="flex gap-3 flex-wrap">
                         <Button
                           variant={pendingGlobalAction === 'tilt-all-closed' ? "destructive" : "secondary"}
-                          onClick={() => handleGlobalAction(() => handleTiltAll(0), 'tilt-all-closed')}
+                          onClick={() => handleGlobalAction(() => handleTiltAll(20), 'tilt-all-closed')}
                           className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
                         >
-                          {pendingGlobalAction === 'tilt-all-closed' ? 'Tap again' : 'Tilt All Closed'}
+                          {pendingGlobalAction === 'tilt-all-closed' ? 'Tap again' : 'Tilt All (Closed)'}
                         </Button>
                         <Button
                           variant={pendingGlobalAction === 'tilt-all-half' ? "destructive" : "secondary"}
                           onClick={() => handleGlobalAction(() => handleTiltAll(50), 'tilt-all-half')}
                           className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
                         >
-                          {pendingGlobalAction === 'tilt-all-half' ? 'Tap again' : 'Tilt All Half'}
+                          {pendingGlobalAction === 'tilt-all-half' ? 'Tap again' : 'Tilt All (Half)'}
                         </Button>
                       </div>
                     </div>
