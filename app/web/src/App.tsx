@@ -322,7 +322,7 @@ export function App() {
                       <div className="flex gap-3 flex-wrap">
                         <Button
                           variant={pendingGlobalAction === 'tilt-all-closed' ? "destructive" : "secondary"}
-                          onClick={() => handleGlobalAction(() => handleTiltAll(20), 'tilt-all-closed')}
+                          onClick={() => handleGlobalAction(() => handleTiltAll(0), 'tilt-all-closed')}
                           className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
                         >
                           {pendingGlobalAction === 'tilt-all-closed' ? 'Tap again' : 'Tilt All (Closed)'}
