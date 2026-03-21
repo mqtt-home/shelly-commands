@@ -22,10 +22,10 @@ func (s *ShadingActor) Apply(command commands.LLCommand) {
 		}
 	case commands.LLActionTilt:
 		if s.IsRollerShutter() {
-			logger.Info("Ignoring tilt command for roller shutter", s.Name)
-			return
+			s.TiltRollerShutter()
+		} else {
+			s.Tilt(command.Position)
 		}
-		s.Tilt(command.Position)
 	case commands.LLActionSlat:
 		if s.IsRollerShutter() {
 			logger.Info("Ignoring slat command for roller shutter", s.Name)
@@ -75,6 +75,30 @@ func (s *ShadingActor) Tilt(position int) {
 	s.mu.Unlock()
 
 	logger.Info("Tilt command completed successfully", s.Name, "position", position, "tilt percentage", s.Config.TiltPercentage)
+}
+
+func (s *ShadingActor) TiltRollerShutter() {
+	tiltPos := s.Config.TiltPosition
+	logger.Info("Tilt roller shutter command started", s.Name, "target position", tiltPos)
+
+	// Check if optimization is enabled and we're already in the correct position
+	if config.Get().Shelly.GetOptimizeTilt() && s.Tilted && s.Position == tiltPos {
+		logger.Info("Ignoring tilt command, already at tilt position", s.Name, "current position", s.Position)
+		return
+	}
+
+	_, err := s.SetPosition(tiltPos)
+	if err != nil {
+		logger.Error("Tilt roller shutter failed", s.Name, err)
+		return
+	}
+
+	s.mu.Lock()
+	s.Tilted = true
+	s.TiltPosition = tiltPos
+	s.mu.Unlock()
+
+	logger.Info("Tilt roller shutter command completed", s.Name, "position", tiltPos)
 }
 
 func (s *ShadingActor) SlatOnly(position int) {

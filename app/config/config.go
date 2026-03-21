@@ -32,6 +32,7 @@ const (
 
 type BlindsConfig struct {
 	TiltPercentage int `json:"tiltPercentage"`
+	TiltPosition   int `json:"tiltPosition,omitempty"`
 }
 
 type Device struct {

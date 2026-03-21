@@ -24,7 +24,7 @@ export function GroupCard({ group, globalSafeMode, onShowDetails }: GroupCardPro
   );
 
   // Check if any actor in the group is tilted
-  const hasActorsToTilt = group.actors.some(actor => actor.deviceType === 'blinds');
+  const hasActorsToTilt = group.actors.some(actor => actor.deviceType === 'blinds' || actor.deviceType === 'rollershutter');
   const anyTilted = group.actors.some(actor => actor.tilted);
 
   const handleButtonAction = (action: () => Promise<void>, actionId: string) => {
