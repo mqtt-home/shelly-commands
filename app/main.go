@@ -1,9 +1,13 @@
 package main
 
 import (
+	"expvar"
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -106,8 +110,15 @@ func subscribeToCommands(cfg config.Config, actors *shelly.ActorRegistry) {
 
 var registry = shelly.NewActorRegistry()
 
+func initPprof() {
+	go func() {
+		http.ListenAndServe(":6060", nil)
+	}()
+}
+
 func main() {
-	logger.Info("Shelly Commands", version.Info())
+	logger.Init("info", logger.Logger())
+	logger.Info("Shelly Commands", "version", version.Info())
 
 	if len(os.Args) < 2 {
 		logger.Error("No configuration file specified")
@@ -134,6 +145,15 @@ func main() {
 
 		logger.Info("Deadlock monitor started")
 	}
+
+	initPprof()
+
+	expvar.Publish("goroutines", expvar.Func(func() any {
+		return runtime.NumGoroutine()
+	}))
+	expvar.Publish("actorCount", expvar.Func(func() any {
+		return len(registry.GetAllActors())
+	}))
 
 	mqtt.Start(cfg.MQTT, "shelly_mqtt")
 
