@@ -2,7 +2,6 @@ package main
 
 import (
 	"expvar"
-	"fmt"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -33,7 +32,7 @@ func startActors(cfg config.Shelly) {
 }
 
 func startActor(device *config.Device, wg *sync.WaitGroup) *shelly.ShadingActor {
-	logger.Info(fmt.Sprintf("Initializing actor: %s", device.Name), device.TopicBase)
+	logger.Info("Initializing actor", "name", device.Name, "topic_base", device.TopicBase)
 	actor := shelly.NewShadingActor(*device)
 	err := actor.Start()
 	if err != nil {
@@ -51,7 +50,7 @@ func subscribeToCommands(cfg config.Config, actors *shelly.ActorRegistry) {
 	logger.Info("Subscribing to MQTT commands", "pattern", prefix+"+"+postfix)
 
 	mqtt.Subscribe(prefix+"+"+postfix, func(topic string, payload []byte) {
-		logger.Debug("Received MQTT command message", topic, string(payload))
+		logger.Debug("Received MQTT command message", "topic", topic, "payload", string(payload))
 
 		targetName := topic[len(prefix) : len(topic)-len(postfix)]
 
@@ -126,12 +125,12 @@ func main() {
 	}
 
 	configFile := os.Args[1]
-	logger.Info("Configuration file:", configFile)
+	logger.Info("Configuration file", "path", configFile)
 	err := error(nil)
 
 	cfg, err := config.LoadConfig(configFile)
 	if err != nil {
-		logger.Error("Failed to load configuration", err)
+		logger.Error("Failed to load configuration", "error", err)
 		return
 	}
 
@@ -169,7 +168,7 @@ func main() {
 		go func() {
 			err := webServer.Start(cfg.Web.Port)
 			if err != nil {
-				logger.Error("Failed to start web server", err)
+				logger.Error("Failed to start web server", "error", err)
 			}
 		}()
 		logger.Info("Application is now ready. Web interface available at http://localhost:" + strconv.Itoa(cfg.Web.Port) + ". Press Ctrl+C to quit.")

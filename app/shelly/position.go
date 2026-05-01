@@ -35,7 +35,7 @@ func (s *ShadingActor) getPosition() (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	logger.Debug("Getting cached position", s.Name, s.Position)
+	logger.Debug("Getting cached position", "actor", s.Name, "position", s.Position)
 	return s.Position, nil
 }
 
@@ -47,13 +47,13 @@ func (s *ShadingActor) SetPosition(position int) (bool, error) {
 	// https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Cover#mqtt-control
 
 	if position == 0 {
-		logger.Debug("Close blinds", s.Name)
+		logger.Debug("Close blinds", "actor", s.Name)
 		mqtt.PublishAbsolute(s.TopicBase+"/command/cover:0", "close", false)
 	} else if position == 100 {
-		logger.Debug("Open blinds", s.Name)
+		logger.Debug("Open blinds", "actor", s.Name)
 		mqtt.PublishAbsolute(s.TopicBase+"/command/cover:0", "open", false)
 	} else {
-		logger.Debug("Set blinds position", s.Name, "to", position)
+		logger.Debug("Set blinds position", "actor", s.Name, "to", position)
 		mqtt.PublishAbsolute(s.TopicBase+"/command/cover:0", "pos,"+strconv.Itoa(position), false)
 	}
 
@@ -78,12 +78,12 @@ func (s *ShadingActor) WaitForPosition(waitGroup *sync.WaitGroup, position int, 
 		return fmt.Errorf("invalid position")
 	}
 
-	logger.Info("Starting position wait", s.Name, "target position", position, "timeout", timeout)
+	logger.Info("Starting position wait", "actor", s.Name, "target_position", position, "timeout", timeout)
 	waitGroup.Add(1)
 
 	go func() {
 		defer func() {
-			logger.Debug("Position wait goroutine finishing", s.Name, "target", position)
+			logger.Debug("Position wait goroutine finishing", "actor", s.Name, "target", position)
 			waitGroup.Done()
 		}()
 
@@ -94,20 +94,20 @@ func (s *ShadingActor) WaitForPosition(waitGroup *sync.WaitGroup, position int, 
 			checkCount++
 			currentPosition, err := s.GetPosition()
 			if err != nil {
-				logger.Error("Failed to get position during wait", s.Name, err)
+				logger.Error("Failed to get position during wait", "actor", s.Name, "error", err)
 				return
 			}
 
 			if currentPosition == position {
-				logger.Info("Position reached successfully", s.Name, "position", position, "checks", checkCount, "duration", time.Since(startTime))
+				logger.Info("Position reached successfully", "actor", s.Name, "position", position, "checks", checkCount, "duration", time.Since(startTime))
 				return
 			}
 
 			elapsed := time.Since(startTime)
-			logger.Debug("Waiting for position", s.Name, "target", position, "current", currentPosition, "elapsed", elapsed, "checks", checkCount)
+			logger.Debug("Waiting for position", "actor", s.Name, "target", position, "current", currentPosition, "elapsed", elapsed, "checks", checkCount)
 
 			if elapsed.Seconds() > float64(timeout) {
-				logger.Error("Timeout waiting for position", s.Name, "target", position, "current", currentPosition, "timeout", timeout, "checks", checkCount)
+				logger.Error("Timeout waiting for position", "actor", s.Name, "target", position, "current", currentPosition, "timeout", timeout, "checks", checkCount)
 				return
 			}
 

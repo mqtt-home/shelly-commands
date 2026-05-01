@@ -135,7 +135,7 @@ func (ws *WebServer) getAllActors(w http.ResponseWriter, r *http.Request) {
 		// Get current position
 		position, err := actor.GetPosition()
 		if err != nil {
-			logger.Error("Failed to get position for actor", actor.Name, err)
+			logger.Error("Failed to get position for actor", "actor", actor.Name, "error", err)
 			position = actor.Position // fallback to cached position
 		}
 
@@ -453,7 +453,7 @@ func (ws *WebServer) getAllGroups(w http.ResponseWriter, r *http.Request) {
 			// Get current position
 			position, err := actor.GetPosition()
 			if err != nil {
-				logger.Error("Failed to get position for actor", actor.Name, err)
+				logger.Error("Failed to get position for actor", "actor", actor.Name, "error", err)
 				position = actor.Position // fallback to cached position
 			}
 
@@ -695,45 +695,45 @@ func (ws *WebServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case msg := <-shelly.PositionChangeChan:
-			logger.Debug("Received position change event for SSE", msg.ActorName, msg.Position, "client", clientID)
+			logger.Debug("Received position change event for SSE", "actor", msg.ActorName, "position", msg.Position, "client", clientID)
 			actorsState := ws.getAllActorsState()
 			message, err := json.Marshal(actorsState)
 			if err != nil {
-				logger.Error("Failed to marshal actors state for SSE position change", err)
+				logger.Error("Failed to marshal actors state for SSE position change", "error", err)
 				continue
 			}
 			_, writeErr := fmt.Fprintf(w, "data: %s\n\n", string(message))
 			if writeErr != nil {
-				logger.Error("Failed to write SSE position change message", writeErr, "client", clientID)
+				logger.Error("Failed to write SSE position change message", "error", writeErr, "client", clientID)
 				return
 			}
 			if ok {
 				flusher.Flush()
 			}
 		case <-r.Context().Done():
-			logger.Debug("SSE client context done", clientID)
+			logger.Debug("SSE client context done", "client", clientID)
 			return
 		case <-ticker.C:
-			logger.Debug("SSE periodic update", clientID)
+			logger.Debug("SSE periodic update", "client", clientID)
 			actorsState := ws.getAllActorsState()
 			message, err := json.Marshal(actorsState)
 			if err != nil {
-				logger.Error("Failed to marshal actors state for SSE periodic update", err)
+				logger.Error("Failed to marshal actors state for SSE periodic update", "error", err)
 				continue
 			}
 			_, writeErr := fmt.Fprintf(w, "data: %s\n\n", string(message))
 			if writeErr != nil {
-				logger.Error("Failed to write SSE periodic message", writeErr, "client", clientID)
+				logger.Error("Failed to write SSE periodic message", "error", writeErr, "client", clientID)
 				return
 			}
 			if ok {
 				flusher.Flush()
 			}
 		case msg := <-channel:
-			logger.Debug("SSE broadcast message", clientID)
+			logger.Debug("SSE broadcast message", "client", clientID)
 			_, writeErr := fmt.Fprintf(w, "data: %s\n\n", msg)
 			if writeErr != nil {
-				logger.Error("Failed to write SSE broadcast message", writeErr, "client", clientID)
+				logger.Error("Failed to write SSE broadcast message", "error", writeErr, "client", clientID)
 				return
 			}
 			if ok {
@@ -748,7 +748,7 @@ func (ws *WebServer) broadcastStateChange() {
 	actorsState := ws.getAllActorsState()
 	message, err := json.Marshal(actorsState)
 	if err != nil {
-		logger.Error("Failed to marshal actors state for SSE broadcast", err)
+		logger.Error("Failed to marshal actors state for SSE broadcast", "error", err)
 		return
 	}
 	messageStr := string(message)
@@ -778,7 +778,7 @@ func (ws *WebServer) getAllActorsState() []ActorStatus {
 		// Get current position
 		position, err := actor.GetPosition()
 		if err != nil {
-			logger.Error("Failed to get position for actor", actor.Name, err)
+			logger.Error("Failed to get position for actor", "actor", actor.Name, "error", err)
 			position = actor.Position // fallback to cached position
 		}
 

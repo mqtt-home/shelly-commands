@@ -16,11 +16,11 @@ func Times[T any](times int, f func() (T, error)) (T, error) {
 
 		current++
 		if current >= times {
-			logger.Error("Failed to execute after", times)
+			logger.Error("Failed to execute after retries", "attempts", times)
 			return zeroValue, err
 		}
 
-		logger.Error("Failed to execute, retrying: ", err)
+		logger.Error("Failed to execute, retrying", "error", err)
 		time.Sleep(500 * time.Millisecond)
 	}
 }

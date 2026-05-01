@@ -84,13 +84,13 @@ func (s *ShadingActor) IsInGroup(groupID string) bool {
 
 func (s *ShadingActor) Start() error {
 	mqtt.Subscribe(s.TopicBase+"/status/cover:0", func(topic string, payload []byte) {
-		logger.Debug("Received MQTT message", topic, string(payload))
+		logger.Debug("Received MQTT message", "topic", topic, "payload", string(payload))
 
 		status := &Status{}
 
 		err := json.Unmarshal(payload, status)
 		if err != nil {
-			logger.Error("Failed to parse status", s, err)
+			logger.Error("Failed to parse status", "actor", s.Name, "error", err)
 			return
 		}
 
@@ -103,20 +103,20 @@ func (s *ShadingActor) Start() error {
 		s.Tilted = status.SlatPos != 0
 		s.mu.Unlock()
 
-		logger.Debug("Position updated", s.Name, "from", oldPosition, "to", status.CurrentPos, "tilt from", oldTiltPosition, "to", status.SlatPos)
+		logger.Debug("Position updated", "actor", s.Name, "from", oldPosition, "to", status.CurrentPos, "tilt_from", oldTiltPosition, "tilt_to", status.SlatPos)
 
 		// Non-blocking send to position change channel
 		event := PositionChangeEvent{ActorName: s.Name, Position: status.CurrentPos, SlatPosition: status.SlatPos}
 		select {
 		case PositionChangeChan <- event:
-			logger.Debug("Position change event sent", s.Name, status.CurrentPos)
+			logger.Debug("Position change event sent", "actor", s.Name, "position", status.CurrentPos)
 		default:
-			logger.Warn("Position change channel is full, dropping event", s.Name, status.CurrentPos)
+			logger.Warn("Position change channel is full, dropping event", "actor", s.Name, "position", status.CurrentPos)
 		}
 	})
 
 	mqtt.PublishAbsolute(s.TopicBase+"/command/cover:0", "status_update", false)
-	logger.Info("Actor started and subscribed to MQTT", s.Name, s.TopicBase)
+	logger.Info("Actor started and subscribed to MQTT", "actor", s.Name, "topic_base", s.TopicBase)
 
 	return nil
 }
