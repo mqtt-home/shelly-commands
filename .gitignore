@@ -30,3 +30,4 @@ node_modules/
 # compiled vite config (Vite would load it instead of the .ts)
 app/web/vite.config.js
 app/web/vite.config.d.ts
+app/web/*.tsbuildinfo
