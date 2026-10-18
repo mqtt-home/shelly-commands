@@ -1,7 +1,10 @@
+# Supply chain: never resolve a version that has been public for less than a
+# week (value in minutes). Most malicious releases are pulled within days.
+minimumReleaseAge: 10080
+
 # pnpm 11 blocks dependency build scripts by default and fails the install with
 # ERR_PNPM_IGNORED_BUILDS; allow the two that actually need to run so the vite
-# build works. (Replaces the pre-v11 `onlyBuiltDependencies` list, which pnpm 11
-# silently ignores.)
+# build works.
 allowBuilds:
   esbuild: true
   "@tailwindcss/oxide": true

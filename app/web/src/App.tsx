@@ -1,426 +1,324 @@
-import { useEffect, useState, useRef } from 'react';
-import { ActorStatus, GroupInfo } from '@/types/actor';
-import { API_BASE, fetchActors, fetchGroups, tiltAllActors, setAllActorsPosition } from '@/lib/api';
-import { useSSE } from '@/hooks/useSSE';
-import { ActorCard } from '@/components/ActorCard';
-import { GroupCard } from '@/components/GroupCard';
-import { GroupDialog } from '@/components/GroupDialog';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, Home, Shield, Users, User } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react'
+import { Blinds, ChevronDown, ChevronUp, RefreshCw, Shield, ShieldCheck } from 'lucide-react'
+import { ActorStatus, GroupInfo } from '@/types/actor'
+import { API_BASE, fetchActors, fetchGroups, tiltAllActors, setAllActorsPosition } from '@/lib/api'
+import { useSSE } from '@/hooks/useSSE'
+import { useSafeAction } from '@/hooks/useSafeAction'
+import { ActorCard } from '@/components/ActorCard'
+import { GroupCard } from '@/components/GroupCard'
+import { GroupDialog } from '@/components/GroupDialog'
+import { ButtonRow, SafeButton } from '@/components/Controls'
+import { LANGS, useI18n } from '@/lib/i18n'
+import { byRank } from '@/lib/sort'
 
-// Function to detect mobile devices
-const isMobileDevice = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-         (window.innerWidth <= 768);
-};
+// Phones start in safe mode: a pocket tap must not move the blinds.
+const isMobileDevice = () =>
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768
 
 export function App() {
-  const [actors, setActors] = useState<ActorStatus[]>([]);
-  const [groups, setGroups] = useState<GroupInfo[]>([]);
-  const [selectedGroup, setSelectedGroup] = useState<GroupInfo | null>(null);
-  const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [globalSafeMode, setGlobalSafeMode] = useState(isMobileDevice());
-  const [pendingGlobalAction, setPendingGlobalAction] = useState<string | null>(null);
-  const [globalPendingTimeout, setGlobalPendingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const executingGlobalActionRef = useRef(false);
-  
-  // Use SSE for real-time updates
-  const { data: sseData, isConnected, error: sseError, reconnect } = useSSE(API_BASE + '/events');
+  const { t } = useI18n()
+  const [actors, setActors] = useState<ActorStatus[]>([])
+  const [groups, setGroups] = useState<GroupInfo[]>([])
+  const [selectedGroup, setSelectedGroup] = useState<GroupInfo | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [globalSafeMode, setGlobalSafeMode] = useState(isMobileDevice())
+  const executingGlobalActionRef = useRef(false)
 
-  // Update actors when SSE data changes
+  const { data: sseData, isConnected, error: sseError, reconnect } = useSSE(API_BASE + '/events')
+
   useEffect(() => {
     if (sseData !== undefined && !executingGlobalActionRef.current) {
-      console.log('SSE data received:', sseData);
-      setActors(sseData);
-      setIsLoading(false);
-      setError(null);
+      setActors(sseData ?? [])
+      setIsLoading(false)
+      setError(null)
     }
-  }, [sseData]);
+  }, [sseData])
 
-  // Handle SSE connection success - set loading to false after a short delay if connected but no data
+  // Connected but no data yet: stop showing the spinner after 2 s.
   useEffect(() => {
     if (isConnected && isLoading) {
-      const timeout = setTimeout(() => {
-        if (isLoading) {
-          setIsLoading(false);
-        }
-      }, 2000); // Wait 2 seconds for initial data
-      return () => clearTimeout(timeout);
+      const timeout = setTimeout(() => setIsLoading(false), 2000)
+      return () => clearTimeout(timeout)
     }
-  }, [isConnected, isLoading]);
+  }, [isConnected, isLoading])
 
-  // Handle SSE connection errors
   useEffect(() => {
-    if (sseError) {
-      setError(sseError);
-    }
-  }, [sseError]);
+    if (sseError) setError(sseError)
+  }, [sseError])
 
   const loadActors = async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-      const data = await fetchActors();
-      setActors(data);
+      setIsLoading(true)
+      setError(null)
+      setActors((await fetchActors()) ?? [])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load actors');
-      console.error('Error loading actors:', err);
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
-  const loadGroups = async () => {
-    try {
-      const data = await fetchGroups();
-      setGroups(data || []); // Ensure we always set an array
-    } catch (err) {
-      console.error('Error loading groups:', err);
-      setGroups([]); // Set empty array on error
+  // Fallback while the event stream is not up yet.
+  useEffect(() => {
+    if (!isConnected && isLoading) loadActors()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, isLoading])
+
+  useEffect(() => {
+    fetchGroups()
+      .then((g) => setGroups(g ?? []))
+      .catch(() => setGroups([]))
+  }, [actors])
+
+  // Keep the open group dialog on fresh data.
+  const openGroup = selectedGroup ? (groups.find((g) => g.groupId === selectedGroup.groupId) ?? selectedGroup) : null
+
+  useEffect(() => {
+    const onResize = () => {
+      if (isMobileDevice()) setGlobalSafeMode(true)
     }
-  };
-
-  const handleShowGroupDetails = (group: GroupInfo) => {
-    setSelectedGroup(group);
-    setIsGroupDialogOpen(true);
-  };
-
-  const handleCloseGroupDialog = () => {
-    setIsGroupDialogOpen(false);
-    setSelectedGroup(null);
-  };
-
-  // Fallback: load actors initially if SSE is not connected or hasn't received data yet
-  useEffect(() => {
-    if (!isConnected && isLoading) {
-      loadActors();
-    }
-  }, [isConnected, isLoading]);
-
-  // Load groups data
-  useEffect(() => {
-    loadGroups();
-  }, [actors]); // Reload groups when actors change
-
-  // Cleanup global timeout on unmount
-  useEffect(() => {
+    window.addEventListener('resize', onResize)
+    window.addEventListener('orientationchange', onResize)
     return () => {
-      if (globalPendingTimeout) {
-        clearTimeout(globalPendingTimeout);
-      }
-    };
-  }, [globalPendingTimeout]);
-
-  // Auto-enable global safe mode on mobile device detection changes
-  useEffect(() => {
-    const handleResize = () => {
-      const isMobile = isMobileDevice();
-      if (isMobile && !globalSafeMode) {
-        setGlobalSafeMode(true);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
-    };
-  }, [globalSafeMode]);
-
-  const handleTiltAll = async (position: number) => {
-    try {
-      await tiltAllActors(position);
-      // SSE will automatically update the UI, no need to manually refresh
-    } catch (error) {
-      console.error('Failed to tilt all actors:', error);
-      alert('Failed to tilt all actors. Please try again.');
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('orientationchange', onResize)
     }
-  };
+  }, [])
 
-  const handleSetAllPosition = async (position: number) => {
-    try {
-      await setAllActorsPosition(position);
-      // SSE will automatically update the UI, no need to manually refresh
-    } catch (error) {
-      console.error('Failed to set position for all actors:', error);
-      alert('Failed to set position for all actors. Please try again.');
-    }
-  };
-
-  const handleGlobalAction = async (action: () => Promise<void>, actionName: string) => {
-    if (globalSafeMode) {
-      if (pendingGlobalAction === actionName) {
-        // Execute the action if it's the second tap
-        clearGlobalPendingAction();
-        executingGlobalActionRef.current = true;
-        await action();
-        executingGlobalActionRef.current = false;
-      } else {
-        // First tap - set pending action
-        setPendingGlobalAction(actionName);
-        // Clear any existing timeout
-        if (globalPendingTimeout) {
-          clearTimeout(globalPendingTimeout);
-        }
-        // Set new timeout to clear pending action after 3 seconds
-        const timeoutId = setTimeout(() => {
-          setPendingGlobalAction(null);
-          setGlobalPendingTimeout(null);
-        }, 3000);
-        setGlobalPendingTimeout(timeoutId);
-      }
-    } else {
-      // Direct execution when safe mode is disabled
-      executingGlobalActionRef.current = true;
-      await action();
-      executingGlobalActionRef.current = false;
-    }
-  };
-
-  const clearGlobalPendingAction = () => {
-    setPendingGlobalAction(null);
-    if (globalPendingTimeout) {
-      clearTimeout(globalPendingTimeout);
-      setGlobalPendingTimeout(null);
-    }
-  };
-
-  const toggleGlobalSafeMode = () => {
-    setGlobalSafeMode(!globalSafeMode);
-    clearGlobalPendingAction();
-  };
+  const header = (
+    <header className="top-bar">
+      <div className="mx-auto flex max-w-6xl items-center gap-3 px-safe py-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="ico">
+            <Blinds />
+          </span>
+          <div className="min-w-0">
+            <div className="truncate text-[17px] leading-tight font-semibold tracking-tight">{t('title')}</div>
+            <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--ink-3)' }}>
+              {isConnected ? (
+                <>
+                  <span className="dot live" /> shelly
+                </>
+              ) : (
+                <>
+                  <span className="dot bad" /> {t('disconnected')}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {!isConnected && (
+          <button className="icon-btn" onClick={reconnect} aria-label={t('reconnect')} title={t('reconnect')}>
+            <RefreshCw className="size-[18px]" />
+          </button>
+        )}
+        <button
+          className="icon-btn"
+          aria-pressed={globalSafeMode}
+          onClick={() => setGlobalSafeMode((s) => !s)}
+          aria-label={globalSafeMode ? t('safe.on') : t('safe.off')}
+          title={globalSafeMode ? t('safe.on') : t('safe.off')}
+        >
+          {globalSafeMode ? <ShieldCheck className="size-[18px]" /> : <Shield className="size-[18px]" />}
+        </button>
+        <LangSwitch />
+      </div>
+    </header>
+  )
 
   if (isLoading && actors.length === 0) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
-          <p className="text-muted-foreground">Loading actors...</p>
+      <div className="min-h-screen">
+        {header}
+        <div className="flex flex-col items-center gap-3 pt-24" style={{ color: 'var(--ink-3)' }}>
+          <RefreshCw className="size-6 animate-spin" />
+          <p>{t('loading')}</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (error && actors.length === 0) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-red-600">Error</CardTitle>
-            <CardDescription>{error}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={loadActors} className="w-full">
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
-      <div className="container mx-auto p-4 sm:p-6">
-        <div className="mb-6 sm:mb-8">
-          <div className="flex items-center justify-between mb-4 gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="p-2 bg-primary rounded-lg shrink-0">
-                <Home className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl font-bold truncate">Shelly Control Panel</h1>
-                <p className="text-muted-foreground text-sm sm:text-base hidden sm:block">
-                  Manage your smart blinds and shutters
-                </p>
-              </div>
+      <div className="min-h-screen">
+        {header}
+        <div className="mx-auto max-w-md px-safe pt-10">
+          <div className="card">
+            <div className="card-h">
+              <span className="dot bad" />
+              <h3>{t('error.title')}</h3>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                variant={globalSafeMode ? "default" : "ghost"}
-                size="icon"
-                onClick={toggleGlobalSafeMode}
-                className="h-9 w-9"
-                title={globalSafeMode ? "Global Safe Mode ON" : "Global Safe Mode OFF"}
-              >
-                <Shield className="h-4 w-4" />
-              </Button>
-              <ThemeToggle />
-              {!isConnected && (
-                <Button
-                  variant="outline"
-                  onClick={reconnect}
-                  disabled={isLoading}
-                  className="flex items-center gap-2"
-                  size="sm"
-                >
-                  <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">Reconnect</span>
-                </Button>
-              )}
+            <div className="card-b space-y-3">
+              <p className="text-[13px]" style={{ color: 'var(--ink-3)' }}>
+                {error}
+              </p>
+              <button className="btn w-full" onClick={loadActors}>
+                {t('retry')}
+              </button>
             </div>
           </div>
-
-          {actors.length > 1 && (
-            <Card className="mb-4 sm:mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>Global Controls</span>
-                  {globalSafeMode && (
-                    <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
-                      Safe Mode ON
-                    </span>
-                  )}
-                </CardTitle>
-                <CardDescription>
-                  Control all blinds and shutters at once
-                  {globalSafeMode && (
-                    <span className="block text-xs text-blue-600 mt-1">
-                      Double tap buttons to execute
-                      {isMobileDevice() && (
-                        <span className="text-xs text-muted-foreground block">
-                          (Auto-enabled on mobile)
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Position Controls */}
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Position</h4>
-                    <div className="flex gap-3 flex-wrap">
-                      <Button
-                        variant={pendingGlobalAction === 'close-all' ? "destructive" : "secondary"}
-                        onClick={() => handleGlobalAction(() => handleSetAllPosition(0), 'close-all')}
-                        className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
-                      >
-                        {pendingGlobalAction === 'close-all' ? 'Tap again' : 'Close All'}
-                      </Button>
-                      <Button
-                        variant={pendingGlobalAction === 'open-all' ? "destructive" : "secondary"}
-                        onClick={() => handleGlobalAction(() => handleSetAllPosition(100), 'open-all')}
-                        className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
-                      >
-                        {pendingGlobalAction === 'open-all' ? 'Tap again' : 'Open All'}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Tilt Controls for Blinds */}
-                  {actors.some(actor => actor.deviceType === 'blinds') && (
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Tilt (Blinds only)</h4>
-                      <div className="flex gap-3 flex-wrap">
-                        <Button
-                          variant={pendingGlobalAction === 'tilt-all-closed' ? "destructive" : "secondary"}
-                          onClick={() => handleGlobalAction(() => handleTiltAll(0), 'tilt-all-closed')}
-                          className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
-                        >
-                          {pendingGlobalAction === 'tilt-all-closed' ? 'Tap again' : 'Tilt All (Closed)'}
-                        </Button>
-                        <Button
-                          variant={pendingGlobalAction === 'tilt-all-half' ? "destructive" : "secondary"}
-                          onClick={() => handleGlobalAction(() => handleTiltAll(50), 'tilt-all-half')}
-                          className="flex-1 min-w-0 min-h-[44px] touch-manipulation"
-                        >
-                          {pendingGlobalAction === 'tilt-all-half' ? 'Tap again' : 'Tilt All (Half)'}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
+      </div>
+    )
+  }
+
+  const individual = actors.filter((a) => !a.groupId).sort(byRank)
+
+  return (
+    <div className="min-h-screen overflow-x-hidden">
+      {header}
+      <main className="mx-auto max-w-6xl space-y-6 px-safe pt-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+        {globalSafeMode && (
+          <p className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--ink-3)' }}>
+            <ShieldCheck className="size-4 shrink-0" style={{ color: 'var(--accent-ink)' }} />
+            <span>
+              {t('safe.hint')}
+              {isMobileDevice() && <> · {t('safe.auto')}</>}
+            </span>
+          </p>
+        )}
+
+        {actors.length > 1 && (
+          <AllControls
+            actors={actors}
+            safe={globalSafeMode}
+            busy={(b) => {
+              executingGlobalActionRef.current = b
+            }}
+          />
+        )}
 
         {actors.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <p className="text-muted-foreground">No actors found</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Make sure your Shelly devices are configured and connected.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="card p-10 text-center">
+            <p className="font-medium">{t('empty')}</p>
+            <p className="mt-1 text-[13px]" style={{ color: 'var(--ink-3)' }}>
+              {t('empty.hint')}
+            </p>
+          </div>
         ) : (
-          <div className="space-y-6">
-            {/* Groups Section */}
-            {groups && groups.length > 0 && (
-              <div>
-                <h2 className="flex items-center gap-2 text-xl font-semibold mb-4">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  Groups ({groups.length})
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <>
+            {groups.length > 0 && (
+              <section>
+                <div className="sec-title">
+                  <h2>{t('groups')}</h2>
+                  <span className="r num">{groups.length}</span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {groups.map((group) => (
                     <GroupCard
                       key={group.groupId}
                       group={group}
                       globalSafeMode={globalSafeMode}
-                      onShowDetails={handleShowGroupDetails}
+                      onShowDetails={setSelectedGroup}
                     />
                   ))}
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* Individual Actors Section */}
-            {(() => {
-              const individualActors = actors.filter(actor => !actor.groupId || actor.groupId === '');
-              return individualActors.length > 0 && (
-                <div>
-                  <h2 className="flex items-center gap-2 text-xl font-semibold mb-4">
-                    <User className="h-5 w-5 text-green-600" />
-                    Individual Actors ({individualActors.length})
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                    {individualActors.sort((a, b) => {
-                      // Sort by rank first (ascending), then by name (alphabetically)
-                      if (a.rank !== b.rank) {
-                        return a.rank - b.rank;
-                      }
-                      return a.name.localeCompare(b.name);
-                    }).map((actor) => (
-                      <ActorCard
-                        key={actor.name}
-                        actor={actor}
-                        globalSafeMode={globalSafeMode}
-                      />
-                    ))}
-                  </div>
+            {individual.length > 0 && (
+              <section>
+                <div className="sec-title">
+                  <h2>{t('devices')}</h2>
+                  <span className="r num">{individual.length}</span>
                 </div>
-              );
-            })()}
-
-            {/* Show message if all actors are grouped */}
-            {groups && groups.length > 0 && actors.filter(actor => !actor.groupId || actor.groupId === '').length === 0 && (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">All actors are organized in groups above.</p>
-                </CardContent>
-              </Card>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {individual.map((actor) => (
+                    <ActorCard key={actor.name} actor={actor} globalSafeMode={globalSafeMode} />
+                  ))}
+                </div>
+              </section>
             )}
+
+            {groups.length > 0 && individual.length === 0 && (
+              <p className="text-center text-[13px]" style={{ color: 'var(--ink-3)' }}>
+                {t('allGrouped')}
+              </p>
+            )}
+          </>
+        )}
+      </main>
+
+      <GroupDialog
+        group={openGroup}
+        isOpen={openGroup !== null}
+        onClose={() => setSelectedGroup(null)}
+        globalSafeMode={globalSafeMode}
+      />
+    </div>
+  )
+}
+
+function AllControls({ actors, safe, busy }: { actors: ActorStatus[]; safe: boolean; busy: (b: boolean) => void }) {
+  const { t } = useI18n()
+  const { pending, run } = useSafeAction(safe)
+  const hasBlinds = actors.some((a) => a.deviceType === 'blinds')
+
+  const exec = async (fn: () => Promise<void>) => {
+    busy(true)
+    try {
+      await fn()
+    } catch (error) {
+      console.error(error)
+      alert(t('failed', { error: error instanceof Error ? error.message : String(error) }))
+    } finally {
+      busy(false)
+    }
+  }
+  const commands: Record<string, () => Promise<void>> = {
+    'close-all': () => exec(() => setAllActorsPosition(0)),
+    'open-all': () => exec(() => setAllActorsPosition(100)),
+    'tilt-all-closed': () => exec(() => tiltAllActors(0)),
+    'tilt-all-half': () => exec(() => tiltAllActors(50)),
+  }
+  const common = { pending, onRun: (id: string) => run(id, commands[id]) }
+
+  return (
+    <section className="card">
+      <div className="card-h">
+        <h3>{t('all')}</h3>
+        <span className="meta num">{t('all.devices', { n: actors.length })}</span>
+      </div>
+      <div className="card-b grid gap-4 sm:grid-cols-2">
+        <div>
+          <div className="sub-label">{t('position')}</div>
+          <ButtonRow>
+            <SafeButton id="close-all" {...common} icon={<ChevronDown className="size-4" />}>
+              {t('all.close')}
+            </SafeButton>
+            <SafeButton id="open-all" {...common} icon={<ChevronUp className="size-4" />}>
+              {t('all.open')}
+            </SafeButton>
+          </ButtonRow>
+        </div>
+        {hasBlinds && (
+          <div>
+            <div className="sub-label">{t('all.slats')}</div>
+            <ButtonRow>
+              <SafeButton id="tilt-all-closed" {...common}>
+                {t('all.tiltClosed')}
+              </SafeButton>
+              <SafeButton id="tilt-all-half" {...common}>
+                {t('all.tiltHalf')}
+              </SafeButton>
+            </ButtonRow>
           </div>
         )}
-
-        {/* Group Dialog */}
-        <GroupDialog
-          group={selectedGroup}
-          isOpen={isGroupDialogOpen}
-          onClose={handleCloseGroupDialog}
-          globalSafeMode={globalSafeMode}
-        />
       </div>
+    </section>
+  )
+}
+
+function LangSwitch() {
+  const i = useI18n()
+  return (
+    <div className="seg" role="group" aria-label={i.t('language')}>
+      {LANGS.map((l) => (
+        <button key={l} aria-pressed={i.lang === l} onClick={() => i.setLang(l)}>
+          {l.toUpperCase()}
+        </button>
+      ))}
     </div>
-  );
+  )
 }

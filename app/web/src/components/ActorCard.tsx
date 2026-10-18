@@ -1,335 +1,116 @@
-import { useState, useEffect, useRef } from 'react';
-import { ActorStatus } from '@/types/actor';
-import { setActorPosition, tiltActor, setSlatPosition } from '@/lib/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
+import { useEffect, useState } from 'react'
+import { Blinds, ChevronDown, ChevronUp } from 'lucide-react'
+import { ActorStatus } from '@/types/actor'
+import { setActorPosition, tiltActor, setSlatPosition } from '@/lib/api'
+import { Slider } from '@/components/ui/slider'
+import { ButtonRow, PositionReadout, SafeButton } from '@/components/Controls'
+import { useSafeAction } from '@/hooks/useSafeAction'
+import { useI18n } from '@/lib/i18n'
 
-interface ActorCardProps {
-  actor: ActorStatus;
-  globalSafeMode: boolean;
-  onRefresh?: () => void;
-}
+export function ActorCard({ actor, globalSafeMode }: { actor: ActorStatus; globalSafeMode: boolean }) {
+  const { t, num } = useI18n()
+  const [position, setPosition] = useState(actor.position)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const { pending, run, clear } = useSafeAction(globalSafeMode)
 
-export function ActorCard({ actor, globalSafeMode, onRefresh }: ActorCardProps) {
-  const [position, setPosition] = useState(actor.position);
-  const [isLoading, setIsLoading] = useState(false);
-  const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [pendingTimeout, setPendingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const executingActionRef = useRef(false);
-
-  // Keep position in sync with actor prop only when not loading and not executing an action
+  // Follow the device unless a command of ours is in flight.
   useEffect(() => {
-    if (!isLoading && !executingActionRef.current) {
-      setPosition(actor.position);
-      setIsDragging(false); // Reset dragging state when position updates from server
+    if (!isLoading) {
+      setPosition(actor.position)
+      setIsDragging(false)
     }
-  }, [actor.position, isLoading]);
+  }, [actor.position, isLoading])
 
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (pendingTimeout) {
-        clearTimeout(pendingTimeout);
-      }
-    };
-  }, [pendingTimeout]);
-
-  const handlePositionChange = async (newPosition: number) => {
-    setIsLoading(true);
-    executingActionRef.current = true;
+  const exec = async (fn: () => Promise<void>) => {
+    setIsLoading(true)
     try {
-      await setActorPosition(actor.name, newPosition);
-      setPosition(newPosition);
-      // SSE will automatically update the UI, no need to manually refresh
+      await fn()
     } catch (error) {
-      console.error('Failed to set position:', error);
-      alert('Failed to set position. Please try again.');
+      console.error(error)
+      alert(t('failed', { error: error instanceof Error ? error.message : String(error) }))
     } finally {
-      setIsLoading(false);
-      executingActionRef.current = false;
+      setIsLoading(false)
     }
-  };
+  }
 
-  const handleTilt = async (tiltPosition: number) => {
-    setIsLoading(true);
-    executingActionRef.current = true;
-    try {
-      await tiltActor(actor.name, tiltPosition);
-      // SSE will automatically update the UI, no need to manually refresh
-    } catch (error) {
-      console.error('Failed to tilt:', error);
-      alert('Failed to tilt. Please try again.');
-    } finally {
-      setIsLoading(false);
-      executingActionRef.current = false;
-    }
-  };
+  const setPos = (p: number) =>
+    exec(async () => {
+      await setActorPosition(actor.name, p)
+      setPosition(p)
+    })
 
-  const handleSlatPosition = async (slatPosition: number) => {
-    setIsLoading(true);
-    executingActionRef.current = true;
-    try {
-      await setSlatPosition(actor.name, slatPosition);
-      // SSE will automatically update the UI, no need to manually refresh
-    } catch (error) {
-      console.error('Failed to set slat position:', error);
-      alert('Failed to set slat position. Please try again.');
-    } finally {
-      setIsLoading(false);
-      executingActionRef.current = false;
-    }
-  };
-
-  const handleButtonAction = async (action: () => Promise<void>, actionName: string) => {
-    if (globalSafeMode) {
-      if (pendingAction === actionName) {
-        // Execute the action if it's the second tap
-        clearPendingAction();
-        await action();
-      } else {
-        // First tap - set pending action
-        setPendingAction(actionName);
-        // Clear any existing timeout
-        if (pendingTimeout) {
-          clearTimeout(pendingTimeout);
-        }
-        // Set new timeout to clear pending action after 3 seconds
-        const timeoutId = setTimeout(() => {
-          setPendingAction(null);
-          setPendingTimeout(null);
-        }, 3000);
-        setPendingTimeout(timeoutId);
-      }
-    } else {
-      // Direct execution when safe mode is disabled
-      await action();
-    }
-  };
-
-  const clearPendingAction = () => {
-    setPendingAction(null);
-    if (pendingTimeout) {
-      clearTimeout(pendingTimeout);
-      setPendingTimeout(null);
-    }
-  };
-
-  const handleSliderChange = (values: number[]) => {
-    // Only update the visual preview, don't execute the command
-    setPosition(values[0]);
-    setIsDragging(true);
-  };
-
-  const handleSliderCommit = (values: number[]) => {
-    // Clear any pending actions when user manually uses slider
-    clearPendingAction();
-    setIsDragging(false);
-    // Execute the actual REST command only on mouse/touch up
-    handlePositionChange(values[0]);
-  };
+  const commands: Record<string, () => Promise<void>> = {
+    close: () => setPos(0),
+    open: () => setPos(100),
+    tilt: () => exec(() => tiltActor(actor.name, 0)),
+  }
+  const shutter = actor.deviceType === 'rollershutter'
+  const steps = shutter ? [20, 40, 60, 80] : [20, 30, 40, 50]
+  for (const s of steps) {
+    commands[`step-${s}`] = shutter ? () => setPos(s) : () => exec(() => setSlatPosition(actor.name, s))
+  }
+  const onRun = (id: string) => run(id, commands[id])
+  const common = { pending, onRun, disabled: isLoading }
 
   return (
-    <Card className="w-full max-w-md touch-manipulation">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between leading-tight">
-          <span className="truncate">{actor.displayName}</span>
-          <div className="flex items-center gap-1 ml-2">
-            {onRefresh && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onRefresh}
-                disabled={isLoading}
-                className="h-8 w-8 shrink-0"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </CardTitle>
-        <CardDescription>
-          {actor.ip} {actor.serial && `(${actor.serial})`}
-          <span className="text-xs text-muted-foreground ml-2">
-            {actor.deviceType === 'rollershutter' ? 'Roller Shutter' : 'Blinds'}
-          </span>
-          {globalSafeMode && (
-            <div className="text-xs text-blue-600 mt-1">
-              Safe Mode: Double tap buttons to execute
-            </div>
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className={isDragging ? "text-blue-600 font-medium" : ""}>
-              Position: {position}%
-              {isDragging && <span className="text-xs ml-1">(preview)</span>}
-            </span>
-            {actor.tilted && (
-              <span className="text-blue-600 font-medium">
-                Tilted at {actor.tiltPosition}%
-              </span>
-            )}
-          </div>
-          
-          <div className="w-full touch-manipulation">
-            <Slider
-              value={[position]}
-              onValueChange={handleSliderChange}
-              onValueCommit={handleSliderCommit}
-              max={100}
-              step={1}
-              disabled={isLoading}
-            />
+    <article className="card touch-manipulation">
+      <div className="card-h">
+        <span className="ico sm" style={{ '--c': 'var(--idle)' } as React.CSSProperties}>
+          <Blinds />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate">{actor.displayName}</h3>
+          <div className="mono truncate text-[11px]" style={{ color: 'var(--ink-4)' }}>
+            {actor.ip}
+            {actor.serial && ` · ${actor.serial}`}
           </div>
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Button
-            variant={pendingAction === 'close' ? "destructive" : "outline"}
-            size="sm"
-            onClick={() => handleButtonAction(() => handlePositionChange(0), 'close')}
-            disabled={isLoading}
-            className="flex items-center gap-2 min-h-[44px] touch-manipulation"
-          >
-            <ChevronDown className="h-4 w-4" />
-            {pendingAction === 'close' ? 'Tap again' : 'Close'}
-          </Button>
-          <Button
-            variant={pendingAction === 'open' ? "destructive" : "outline"}
-            size="sm"
-            onClick={() => handleButtonAction(() => handlePositionChange(100), 'open')}
-            disabled={isLoading}
-            className="flex items-center gap-2 min-h-[44px] touch-manipulation"
-          >
-            <ChevronUp className="h-4 w-4" />
-            {pendingAction === 'open' ? 'Tap again' : 'Open'}
-          </Button>
+        <span className="state">{shutter ? t('type.rollershutter') : t('type.blinds')}</span>
+      </div>
+      <div className="card-b space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <PositionReadout value={position} preview={isDragging} />
+          {actor.tilted && <span className="state info num">{t('tilted', { n: num(actor.tiltPosition) })}</span>}
         </div>
-
-        {actor.deviceType === 'rollershutter' ? (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Tilt</p>
-              <div className="grid grid-cols-1 gap-3">
-                <Button
-                  variant={pendingAction === 'tilt-closed' ? "destructive" : "secondary"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handleTilt(0), 'tilt-closed')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-2"
-                >
-                  {pendingAction === 'tilt-closed' ? 'Tap again' : 'Tilt (Almost Closed)'}
-                </Button>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Quick Positions</p>
-              <div className="grid grid-cols-4 gap-2">
-                <Button
-                  variant={pendingAction === 'pos-20' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handlePositionChange(20), 'pos-20')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-1"
-                >
-                  {pendingAction === 'pos-20' ? 'Tap again' : '20%'}
-                </Button>
-                <Button
-                  variant={pendingAction === 'pos-40' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handlePositionChange(40), 'pos-40')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-1"
-                >
-                  {pendingAction === 'pos-40' ? 'Tap again' : '40%'}
-                </Button>
-                <Button
-                  variant={pendingAction === 'pos-60' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handlePositionChange(60), 'pos-60')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-1"
-                >
-                  {pendingAction === 'pos-60' ? 'Tap again' : '60%'}
-                </Button>
-                <Button
-                  variant={pendingAction === 'pos-80' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handlePositionChange(80), 'pos-80')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-1"
-                >
-                  {pendingAction === 'pos-80' ? 'Tap again' : '80%'}
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Tilt Operations</p>
-              <div className="grid grid-cols-1 gap-3">
-                <Button
-                  variant={pendingAction === 'tilt-closed' ? "destructive" : "secondary"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handleTilt(0), 'tilt-closed')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-2"
-                >
-                  {pendingAction === 'tilt-closed' ? 'Tap again' : 'Tilt (Close & Tilt)'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Slat Control</p>
-              <div className="grid grid-cols-4 gap-2">
-                <Button
-                  variant={pendingAction === 'slat-20' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handleSlatPosition(20), 'slat-20')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-1"
-                >
-                  {pendingAction === 'slat-20' ? 'Tap again' : '20%'}
-                </Button>
-                <Button
-                  variant={pendingAction === 'slat-30' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handleSlatPosition(30), 'slat-30')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-1"
-                >
-                  {pendingAction === 'slat-30' ? 'Tap again' : '30%'}
-                </Button>
-                <Button
-                  variant={pendingAction === 'slat-40' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handleSlatPosition(40), 'slat-40')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-1"
-                >
-                  {pendingAction === 'slat-40' ? 'Tap again' : '40%'}
-                </Button>
-                <Button
-                  variant={pendingAction === 'slat-50' ? "destructive" : "outline"}
-                  size="sm"
-                  onClick={() => handleButtonAction(() => handleSlatPosition(50), 'slat-50')}
-                  disabled={isLoading}
-                  className="min-h-[44px] touch-manipulation text-xs px-1"
-                >
-                  {pendingAction === 'slat-50' ? 'Tap again' : '50%'}
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
-  );
+        <Slider
+          label={t('position')}
+          value={[position]}
+          onValueChange={(v) => {
+            setPosition(v[0])
+            setIsDragging(true)
+          }}
+          onValueCommit={(v) => {
+            clear()
+            setIsDragging(false)
+            setPos(v[0])
+          }}
+          max={100}
+          step={1}
+          disabled={isLoading}
+        />
+        <ButtonRow>
+          <SafeButton id="close" {...common} icon={<ChevronDown className="size-4" />}>
+            {t('close')}
+          </SafeButton>
+          <SafeButton id="open" {...common} icon={<ChevronUp className="size-4" />}>
+            {t('open')}
+          </SafeButton>
+        </ButtonRow>
+        <div>
+          <div className="sub-label">{shutter ? t('quick') : t('slats')}</div>
+          <ButtonRow n={4}>
+            {steps.map((s) => (
+              <SafeButton key={s} id={`step-${s}`} {...common} className="sm">
+                {num(s)} %
+              </SafeButton>
+            ))}
+          </ButtonRow>
+        </div>
+        <SafeButton id="tilt" {...common} className="sm w-full">
+          {shutter ? t('tilt.shutter') : t('tilt.blinds')}
+        </SafeButton>
+      </div>
+    </article>
+  )
 }
