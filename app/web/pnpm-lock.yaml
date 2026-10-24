@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@mqtt-home/ui':
-        specifier: github:mqtt-home/home-ui#v0.1.0
-        version: https://codeload.github.com/mqtt-home/home-ui/tar.gz/490a72ae96d9582d8b499a28a274a5c61679acba(react@19.3.1)(vite@8.3.4(@types/node@26.6.5)(jiti@2.7.0))
+        specifier: github:mqtt-home/home-ui#v0.1.2
+        version: https://codeload.github.com/mqtt-home/home-ui/tar.gz/8109164114a0db9c4e0dbac46b26d7b66d170d6f(react@19.3.1)(vite@8.3.4(@types/node@26.6.5)(jiti@2.7.0))
       '@radix-ui/react-slider':
         specifier: ^1.6.1
         version: 1.6.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -79,9 +79,9 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@mqtt-home/ui@https://codeload.github.com/mqtt-home/home-ui/tar.gz/490a72ae96d9582d8b499a28a274a5c61679acba':
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/mqtt-home/home-ui/tar.gz/490a72ae96d9582d8b499a28a274a5c61679acba}
-    version: 0.1.0
+  '@mqtt-home/ui@https://codeload.github.com/mqtt-home/home-ui/tar.gz/8109164114a0db9c4e0dbac46b26d7b66d170d6f':
+    resolution: {gitHosted: true, integrity: sha512-Bs0oi9ODkMHGctIOMsJ4r37746NlYdS2emX9pDYV4JrqzL4169piRgOEdp3kb3vTi3NxFVVFi507ADXCaCLGzA==, tarball: https://codeload.github.com/mqtt-home/home-ui/tar.gz/8109164114a0db9c4e0dbac46b26d7b66d170d6f}
+    version: 0.1.2
     peerDependencies:
       react: '>=18'
       vite: '>=6'
@@ -874,7 +874,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@mqtt-home/ui@https://codeload.github.com/mqtt-home/home-ui/tar.gz/490a72ae96d9582d8b499a28a274a5c61679acba(react@19.3.1)(vite@8.3.4(@types/node@26.6.5)(jiti@2.7.0))':
+  '@mqtt-home/ui@https://codeload.github.com/mqtt-home/home-ui/tar.gz/8109164114a0db9c4e0dbac46b26d7b66d170d6f(react@19.3.1)(vite@8.3.4(@types/node@26.6.5)(jiti@2.7.0))':
     dependencies:
       '@fontsource-variable/geist': 5.3.0
       '@fontsource-variable/geist-mono': 5.3.0

@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mqtt-home/ui": "github:mqtt-home/home-ui#v0.1.0",
+    "@mqtt-home/ui": "github:mqtt-home/home-ui#v0.1.2",
     "@radix-ui/react-slider": "^1.6.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.58.0",
