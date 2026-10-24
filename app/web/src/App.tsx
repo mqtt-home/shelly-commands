@@ -8,7 +8,7 @@ import { ActorCard } from '@/components/ActorCard'
 import { GroupCard } from '@/components/GroupCard'
 import { GroupDialog } from '@/components/GroupDialog'
 import { ButtonRow, SafeButton } from '@/components/Controls'
-import { LANGS, useI18n } from '@/lib/i18n'
+import { LangSwitch as BaseLangSwitch, useI18n } from '@/lib/i18n'
 import { byRank } from '@/lib/sort'
 
 // Phones start in safe mode: a pocket tap must not move the blinds.
@@ -311,14 +311,5 @@ function AllControls({ actors, safe, busy }: { actors: ActorStatus[]; safe: bool
 }
 
 function LangSwitch() {
-  const i = useI18n()
-  return (
-    <div className="seg" role="group" aria-label={i.t('language')}>
-      {LANGS.map((l) => (
-        <button key={l} aria-pressed={i.lang === l} onClick={() => i.setLang(l)}>
-          {l.toUpperCase()}
-        </button>
-      ))}
-    </div>
-  )
+  return <BaseLangSwitch i18n={useI18n()} />
 }

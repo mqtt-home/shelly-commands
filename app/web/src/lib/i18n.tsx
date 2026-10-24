@@ -1,24 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createI18n, type I18n as BaseI18n } from '@mqtt-home/ui/i18n'
+export { LANGS, LangSwitch, resolveText, type Lang, type Text } from '@mqtt-home/ui/i18n'
 
-export type Lang = 'de' | 'en'
-export const LANGS: Lang[] = ['de', 'en']
-
-/** A configured text per language; "*" applies to every language. */
-export type Text = Record<string, string>
-
-const LANG_KEY = 'home.lang'
-
-// German is the house language; English stays one tap away. Per device.
-function initialLang(): Lang {
-  try {
-    const v = localStorage.getItem(LANG_KEY)
-    if (v === 'de' || v === 'en') return v
-  } catch {
-    // storage blocked
-  }
-  return 'de'
-}
-
+// German is the house language; English stays one tap away (per device).
 const dict = {
   de: {
     'title': 'Rollläden',
@@ -68,7 +51,6 @@ const dict = {
     'allGrouped': 'Alle Geräte sind oben in Gruppen eingeteilt.',
     'failed': 'Befehl fehlgeschlagen: {error}',
     'dialog.close': 'Schließen',
-    'language': 'Sprache',
   },
   en: {
     'title': 'Blinds',
@@ -118,65 +100,10 @@ const dict = {
     'allGrouped': 'All devices are organised in groups above.',
     'failed': 'Command failed: {error}',
     'dialog.close': 'Close',
-    'language': 'Language',
   },
-} satisfies Record<Lang, Record<string, string>>
+}
 
 export type Key = keyof (typeof dict)['de']
+export type I18n = BaseI18n<Key>
 
-export interface I18n {
-  lang: Lang
-  locale: string
-  setLang: (l: Lang) => void
-  /** A UI string with {placeholders}. */
-  t: (key: Key, vars?: Record<string, string | number>) => string
-  /** A configured text in the current language. */
-  tx: (text: Text | null | undefined) => string
-  /** A number in the current locale (8,5 in German). */
-  num: (n: number, decimals?: number) => string
-}
-
-const Ctx = createContext<I18n | null>(null)
-
-export function resolveText(text: Text | null | undefined, lang: Lang) {
-  if (!text) return ''
-  return text[lang] ?? text['*'] ?? text.en ?? text.de ?? Object.values(text)[0] ?? ''
-}
-
-export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>(initialLang)
-
-  const setLang = useCallback((l: Lang) => {
-    setLangState(l)
-    try {
-      localStorage.setItem(LANG_KEY, l)
-    } catch {
-      // convenience only
-    }
-  }, [])
-
-  const value = useMemo<I18n>(() => {
-    const locale = lang === 'de' ? 'de-DE' : 'en-GB'
-    document.documentElement.lang = lang
-    const t: I18n['t'] = (key, vars) =>
-      (dict[lang][key] ?? dict.en[key] ?? key).replace(/\{(\w+)\}/g, (_, k) => String(vars?.[k] ?? ''))
-    const fmt = new Map<number, Intl.NumberFormat>()
-    const num: I18n['num'] = (n, decimals = 0) => {
-      let f = fmt.get(decimals)
-      if (!f) {
-        f = new Intl.NumberFormat(locale, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
-        fmt.set(decimals, f)
-      }
-      return f.format(n)
-    }
-    return { lang, locale, setLang, t, tx: (text) => resolveText(text, lang), num }
-  }, [lang, setLang])
-
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
-}
-
-export function useI18n() {
-  const v = useContext(Ctx)
-  if (!v) throw new Error('useI18n outside I18nProvider')
-  return v
-}
+export const { I18nProvider, useI18n } = createI18n(dict)
